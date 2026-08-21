@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<title>Loods 25 — Voorraadmanifest</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap');
+
+:root{
+  --bg:#080C0A;
+  --bg-soft:#0C1310;
+  --glass:rgba(255,255,255,0.035);
+  --glass-hi:rgba(255,255,255,0.07);
+  --border:rgba(255,255,255,0.09);
+  --border-hi:rgba(255,255,255,0.18);
+  --lime:#B6FF3C;
+  --cyan:#3FE8C8;
+  --violet:#9A86FF;
+  --pink:#FF7FCE;
+  --cream:#F3F6F2;
+  --muted:#8D9A93;
+  --warn:#FFC15C;
+  --danger:#FF6B6B;
+  --grad-a: linear-gradient(135deg, var(--lime), var(--cyan));
+  --grad-b: linear-gradient(135deg, var(--violet), var(--pink));
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--cream);font-family:'Inter',sans-serif;}
+body{
+  min-height:100vh;position:relative;overflow-x:hidden;
+  background:
+    radial-gradient(ellipse 900px 600px at 8% -5%, rgba(182,255,60,0.10), transparent 60%),
+    radial-gradient(ellipse 900px 700px at 95% 10%, rgba(154,134,255,0.09), transparent 55%),
+    radial-gradient(ellipse 800px 800px at 50% 120%, rgba(63,232,200,0.06), transparent 60%),
+    var(--bg);
+}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+  background-size:44px 44px;
+  mask-image:radial-gradient(ellipse 80% 60% at 50% 0%, black, transparent 75%);
+}
+h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;letter-spacing:-0.01em;}
+.mono{font-family:'Space Mono',monospace;}
+
+@keyframes fadeUp{ from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:translateY(0);} }
+.wrap > *{animation:fadeUp .5s cubic-bezier(.16,1,.3,1) both;}
+.wrap > *:nth-child(2){animation-delay:.03s;}
+.wrap > *:nth-child(3){animation-delay:.06s;}
+.wrap > *:nth-child(4){animation-delay:.09s;}
+.wrap > *:nth-child(5){animation-delay:.12s;}
+.wrap > *:nth-child(6){animation-delay:.15s;}
+.wrap > *:nth-child(7){animation-delay:.18s;}
+
+/* ---------- layout shell ---------- */
+.wrap{max-width:1020px;margin:0 auto;padding:28px 20px 70px;position:relative;z-index:1;}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  padding-bottom:24px;margin-bottom:22px;border-bottom:1px solid var(--border);}
+.brand{display:flex;align-items:center;gap:16px;}
+
+.dial{width:60px;height:60px;border-radius:50%;flex-shrink:0;padding:3px;
+  background:conic-gradient(from 200deg, var(--lime), var(--cyan), var(--lime));
+  box-shadow:0 0 22px rgba(182,255,60,0.22);}
+.dial.klant{background:conic-gradient(from 200deg, var(--violet), var(--pink), var(--violet));
+  box-shadow:0 0 22px rgba(154,134,255,0.22);}
+.dial-inner{width:100%;height:100%;border-radius:50%;background:#0A0F0C;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.dial-inner .r{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;color:var(--cream);line-height:1;}
+.dial-inner .l{font-size:7px;letter-spacing:0.18em;color:var(--muted);margin-top:3px;text-transform:uppercase;}
+
+.brand h1{font-size:23px;margin:0;line-height:1.1;font-weight:700;
+  background:var(--grad-a);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.brand p{margin:3px 0 0;color:var(--muted);font-size:12.5px;letter-spacing:0.02em;}
+
+.totals{display:flex;gap:26px;flex-wrap:wrap;}
+.totals .t{text-align:right;}
+.totals .t .n{font-family:'Space Mono',monospace;font-size:22px;font-weight:700;color:var(--cream);}
+.totals .t .l{font-size:10px;color:var(--muted);letter-spacing:0.09em;text-transform:uppercase;margin-top:2px;}
+
+/* ---------- nav tabs ---------- */
+.navtabs{display:inline-flex;gap:4px;margin-bottom:22px;padding:4px;background:var(--glass);
+  border:1px solid var(--border);border-radius:14px;backdrop-filter:blur(16px);}
+.navtab{padding:8px 18px;background:transparent;border:none;color:var(--muted);
+  font-family:'Inter',sans-serif;font-weight:600;font-size:13px;border-radius:10px;
+  cursor:pointer;transition:all .18s ease;}
+.navtab:hover{color:var(--cream);}
+.navtab.active{background:var(--grad-a);color:#08130A;}
+
+/* ---------- login / profiles ---------- */
+.login-shell{max-width:680px;margin:36px auto 0;text-align:center;}
+.login-shell h2{font-size:19px;margin-bottom:6px;font-weight:600;}
+.login-shell .sub{color:var(--muted);font-size:13.5px;margin-bottom:30px;line-height:1.6;}
+.avatar-grid{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;}
+.avatar-tile{
+  width:126px;padding:22px 12px 18px;background:var(--glass);border:1px solid var(--border);
+  border-radius:20px;cursor:pointer;backdrop-filter:blur(16px);
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+  transition:transform .2s cubic-bezier(.16,1,.3,1), border-color .2s, background .2s, box-shadow .2s;
+}
+.avatar-tile:hover{transform:translateY(-4px);border-color:var(--border-hi);background:var(--glass-hi);
+  box-shadow:0 12px 28px rgba(0,0,0,0.35), 0 0 0 1px rgba(182,255,60,0.15);}
+.avatar-circle{width:46px;height:46px;border-radius:50%;background:var(--grad-a);
+  display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;
+  font-weight:700;font-size:17px;color:#08130A;}
+.avatar-tile .nm{font-family:'Space Grotesk',sans-serif;font-size:14.5px;font-weight:600;text-transform:capitalize;}
+.avatar-tile .st{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);letter-spacing:0.03em;}
+.avatar-tile .st .dot{width:6px;height:6px;border-radius:50%;background:var(--lime);box-shadow:0 0 6px var(--lime);}
+.avatar-tile.unclaimed .st .dot{background:var(--warn);box-shadow:0 0 6px var(--warn);}
+.avatar-tile.add{border-style:dashed;border-color:var(--border-hi);background:transparent;}
+.avatar-tile.add .avatar-circle{background:transparent;border:1.5px dashed var(--muted);color:var(--muted);}
+.avatar-tile.add .nm{color:var(--muted);}
+
+.modal-bg{position:fixed;inset:0;background:rgba(4,6,5,0.78);backdrop-filter:blur(6px);
+  display:flex;align-items:center;justify-content:center;z-index:50;padding:16px;}
+.modal{background:#0E1512;border:1px solid var(--border-hi);border-radius:22px;padding:30px;
+  width:100%;max-width:340px;box-shadow:0 24px 60px rgba(0,0,0,0.5);}
+.modal h3{margin:0 0 4px;font-size:19px;font-weight:600;}
+.modal p.hint{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.55;}
+.modal label{display:block;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:7px;margin-top:16px;font-weight:600;}
+.modal input{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;color:var(--cream);
+  padding:11px 13px;font-family:'Space Mono',monospace;font-size:15px;letter-spacing:0.03em;}
+.modal input:focus{outline:none;border-color:var(--lime);box-shadow:0 0 0 3px rgba(182,255,60,0.12);}
+.modal .row-btns{display:flex;gap:10px;margin-top:24px;}
+.err{color:var(--danger);font-size:12px;margin-top:9px;min-height:14px;}
+
+button{cursor:pointer;font-family:'Inter',sans-serif;}
+.btn{background:var(--grad-a);border:none;color:#08130A;font-weight:700;padding:11px 18px;font-size:13.5px;
+  border-radius:12px;letter-spacing:0.01em;transition:transform .15s, box-shadow .15s, filter .15s;}
+.btn:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(182,255,60,0.22);filter:brightness(1.05);}
+.btn.klant{background:var(--grad-b);}
+.btn.klant:hover{box-shadow:0 8px 20px rgba(154,134,255,0.25);}
+.btn.secondary{background:var(--glass);border:1px solid var(--border);color:var(--cream);}
+.btn.secondary:hover{border-color:var(--border-hi);box-shadow:none;transform:none;filter:none;background:var(--glass-hi);}
+.btn.block{width:100%;}
+.btn:disabled{opacity:0.35;cursor:not-allowed;transform:none;box-shadow:none;}
+
+/* ---------- dashboard ---------- */
+.who{display:flex;align-items:center;justify-content:space-between;background:var(--glass);
+  border:1px solid var(--border);border-radius:18px;backdrop-filter:blur(16px);
+  padding:16px 20px;margin-bottom:22px;flex-wrap:wrap;gap:10px;}
+.who .name{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;text-transform:capitalize;}
+.who .name span{color:var(--muted);font-size:11.5px;font-weight:400;display:block;margin-top:3px;font-family:'Inter',sans-serif;}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:22px;}
+@media(max-width:680px){.grid2{grid-template-columns:1fr;}}
+.card{background:var(--glass);border:1px solid var(--border);border-radius:20px;padding:22px;
+  backdrop-filter:blur(16px);transition:border-color .2s, background .2s;}
+.card:hover{border-color:var(--border-hi);}
+.card h2{font-size:15px;margin:0 0 5px;font-weight:600;}
+.card p.hint{color:var(--muted);font-size:12.5px;margin:0 0 16px;line-height:1.55;}
+.card label{display:block;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:7px;font-weight:600;}
+.card input[type=number],.card input[type=text],.card input[type=tel]{width:100%;background:rgba(255,255,255,0.04);
+  border:1px solid var(--border);border-radius:12px;color:var(--cream);
+  padding:11px 13px;font-family:'Space Mono',monospace;font-size:16px;}
+.card input:focus{outline:none;border-color:var(--lime);box-shadow:0 0 0 3px rgba(182,255,60,0.12);}
+.preview{margin-top:11px;font-size:12px;color:var(--muted);min-height:16px;}
+.preview b{color:var(--lime);font-family:'Space Mono',monospace;}
+
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;
+  font-weight:600;padding:0 10px 10px 0;border-bottom:1px solid var(--border);}
+td{padding:11px 10px 11px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:13.5px;}
+td.num,th.num{text-align:right;font-family:'Space Mono',monospace;}
+tr.me td{background:rgba(182,255,60,0.05);}
+tr.clickable{cursor:pointer;}
+tr.clickable:hover td{background:rgba(255,255,255,0.03);}
+.tegoed{color:var(--lime);font-weight:700;}
+.pill{display:inline-block;background:rgba(154,134,255,0.12);border:1px solid rgba(154,134,255,0.3);color:var(--violet);
+  font-size:10px;padding:3px 9px;border-radius:20px;letter-spacing:0.03em;font-weight:600;}
+
+.section-title{display:flex;align-items:baseline;justify-content:space-between;margin:34px 0 12px;flex-wrap:wrap;gap:8px;}
+.section-title h2{font-size:15.5px;margin:0;font-weight:600;}
+.section-title span{font-size:11.5px;color:var(--muted);font-family:'Space Mono',monospace;}
+
+.log{display:flex;flex-direction:column;gap:0;}
+.entry{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:baseline;
+  padding:12px 4px;border-bottom:1px solid rgba(255,255,255,0.05);font-size:13px;}
+.entry:last-child{border-bottom:none;}
+.entry .ts{color:var(--muted);font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;}
+.entry .desc b{color:var(--cream);}
+.entry .desc .sub{color:var(--muted);font-size:11.5px;display:block;margin-top:2px;}
+.entry .delta{font-family:'Space Mono',monospace;font-weight:700;white-space:nowrap;text-align:right;}
+.entry.inleg .delta,.entry.levering .delta{color:var(--lime);}
+.entry.ophalen .delta{color:var(--warn);}
+.empty{color:var(--muted);font-size:13px;padding:24px 0;text-align:center;}
+
+.back-link{color:var(--muted);font-size:12.5px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;
+  margin-bottom:18px;cursor:pointer;background:none;border:none;font-family:'Inter',sans-serif;padding:0;font-weight:500;}
+.back-link:hover{color:var(--cream);}
+
+.klant-search{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;color:var(--cream);
+  padding:11px 14px;font-size:14px;margin-bottom:0;}
+.klant-search:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px rgba(154,134,255,0.12);}
+
+.klant-head{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:24px;}
+.klant-head h1{font-size:25px;margin:0 0 8px;font-weight:700;}
+.klant-head .meta{color:var(--muted);font-size:13px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+.klant-head .meta a{color:var(--cream);text-decoration:none;}
+
+.linklike{background:none;border:none;color:var(--muted);font-size:12px;text-decoration:underline;padding:0;}
+.linklike:hover{color:var(--cream);}
+footer.note{margin-top:38px;color:var(--muted);font-size:11.5px;line-height:1.65;border-top:1px solid var(--border);padding-top:18px;}
+
+.syncdot{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);letter-spacing:0.03em;}
+.syncdot .d{width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:0 0 6px var(--cyan);}
+.syncdot.off .d{background:var(--danger);box-shadow:0 0 6px var(--danger);}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<!-- Supabase JS client (UMD build, geen npm/build-stap nodig) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+/* ============================================================
+ * CONFIG — vul hier je eigen Supabase-projectgegevens in.
+ * Zie README.md voor hoe je hieraan komt. De "anon key" is
+ * bewust publiek/veilig om hier te zetten: alle echte controle
+ * gebeurt in de database via Row Level Security + functies.
+ * ============================================================ */
+const SUPABASE_URL = "PLAK_HIER_JE_SUPABASE_PROJECT_URL";
+const SUPABASE_ANON_KEY = "PLAK_HIER_JE_SUPABASE_ANON_KEY";
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const RATIO_IN = 2, RATIO_OUT = 1;             // leden: 2 planten -> 1 zakje
+const KLANT_RATIO_IN = 4, KLANT_RATIO_OUT = 1; // klanten: 4 geleverd -> 1 zakje
+const MAX_USERS = 25;
+const SESSION_KEY = "loods25-session";
+
+let cache = { users: [], log: [], customers: [] }; // laatst opgehaalde data, voor previews
+let session = localStorage.getItem(SESSION_KEY) || null; // ingelogde user id
+let renderSeq = 0; // voorkomt dat een trage/oude fetch een nieuwere render overschrijft
+
+const ERR_MESSAGES = {
+  LOODS_VOL: 'De loods zit vol (25 profielen).',
+  ONGELDIGE_NAAM: 'Geef een geldige naam op.',
+  NAAM_BESTAAT_AL: 'Die naam bestaat al.',
+  ONGELDIGE_CODE: 'Kies een code van minstens 4 tekens.',
+  AL_GECLAIMD: 'Dit profiel is ondertussen al geclaimd door iemand anders.',
+  GEBRUIKER_NIET_GEVONDEN: 'Gebruiker niet gevonden — probeer opnieuw in te loggen.',
+  ONGELDIG_AANTAL: 'Voer een geldig aantal in.',
+  ONVOLDOENDE_TEGOED: 'Onvoldoende tegoed.',
+  KLANT_BESTAAT_AL: 'Die klant bestaat al.',
+  KLANT_NIET_GEVONDEN: 'Klant niet gevonden.'
+};
+function friendlyError(e){
+  const code = (e && e.message) ? e.message.trim() : '';
+  return ERR_MESSAGES[code] || (code || 'Er ging iets mis. Probeer opnieuw.');
+}
+
+function fmtTs(ts){
+  const d = new Date(ts);
+  return d.toLocaleDateString('nl-BE',{day:'2-digit',month:'2-digit'}) + ' · ' +
+         d.toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'});
+}
+function zakjesVoor(totalIngelegd){ return Math.floor(totalIngelegd / RATIO_IN) * RATIO_OUT; }
+function zakjesVoorKlant(totalGeleverd){ return Math.floor(totalGeleverd / KLANT_RATIO_IN) * KLANT_RATIO_OUT; }
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+async function hashPin(pin){
+  const enc = new TextEncoder().encode(pin);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function getHash(){
+  const h = window.location.hash.replace(/^#\/?/, '');
+  return h.split('/').filter(Boolean); // e.g. [] , ['klanten'], ['klant','abc123']
+}
+function goTo(hash){ window.location.hash = hash; }
+
+// ---------- data laden ----------
+async function fetchUsers(){
+  const { data, error } = await sb.from('users_public').select('*').order('name');
+  if(error){ console.error(error); return []; }
+  return data;
+}
+async function fetchLoodsLog(limit=80){
+  const { data, error } = await sb.from('loods_log').select('*').order('ts',{ascending:false}).limit(limit);
+  if(error){ console.error(error); return []; }
+  return data;
+}
+async function fetchCustomers(){
+  const { data, error } = await sb.from('customers').select('*').order('name');
+  if(error){ console.error(error); return []; }
+  return data;
+}
+async function fetchCustomer(id){
+  const { data, error } = await sb.from('customers').select('*').eq('id', id).maybeSingle();
+  if(error){ console.error(error); return null; }
+  return data;
+}
+async function fetchCustomerLog(customerId, limit=100){
+  const { data, error } = await sb.from('customer_log').select('*').eq('customer_id', customerId)
+    .order('ts',{ascending:false}).limit(limit);
+  if(error){ console.error(error); return []; }
+  return data;
+}
+function getUser(id){ return cache.users.find(u => u.id === id); }
+function clearSessionIfMissing(){
+  if(session && !getUser(session)){ session = null; localStorage.removeItem(SESSION_KEY); }
+}
+
+// ---------- boot ----------
+async function boot(){
+  render(`<div class="empty">Loods wordt geopend…</div>`);
+  await render();
+  window.addEventListener('hashchange', render);
+  setupRealtime();
+}
+
+let pendingRerender = false;
+function setupRealtime(){
+  sb.channel('loods25-changes')
+    .on('postgres_changes', {event:'*', schema:'public', table:'users'}, queueRerender)
+    .on('postgres_changes', {event:'*', schema:'public', table:'loods_log'}, queueRerender)
+    .on('postgres_changes', {event:'*', schema:'public', table:'customers'}, queueRerender)
+    .on('postgres_changes', {event:'*', schema:'public', table:'customer_log'}, queueRerender)
+    .subscribe();
+}
+function queueRerender(){
+  if(pendingRerender) return;
+  pendingRerender = true;
+  setTimeout(()=>{ pendingRerender = false; render(); }, 300);
+}
+
+async function render(overrideHtml){
+  const app = document.getElementById('app');
+  if(typeof overrideHtml === 'string'){ app.innerHTML = overrideHtml; return; }
+
+  const mySeq = ++renderSeq;
+  cache.users = await fetchUsers();
+  clearSessionIfMissing();
+
+  if(!session){
+    if(mySeq !== renderSeq) return;
+    app.innerHTML = loginView();
+    attachLoginHandlers();
+    return;
+  }
+
+  const path = getHash();
+  cache.customers = await fetchCustomers();
+
+  if(path[0] === 'klanten'){
+    if(mySeq !== renderSeq) return;
+    app.innerHTML = klantenListView();
+    attachKlantenListHandlers();
+  } else if(path[0] === 'klant' && path[1]){
+    const k = await fetchCustomer(path[1]);
+    if(!k){ goTo('/klanten'); return; }
+    const klantLog = await fetchCustomerLog(k.id);
+    if(mySeq !== renderSeq) return;
+    app.innerHTML = klantDetailView(k, klantLog);
+    attachKlantDetailHandlers(k);
+  } else {
+    cache.log = await fetchLoodsLog();
+    if(mySeq !== renderSeq) return;
+    app.innerHTML = dashboardView();
+    attachDashboardHandlers();
+  }
+}
+
+function navTabsHtml(active){
+  return `
+    <div class="navtabs">
+      <div class="navtab ${active==='loods'?'active':''}" data-nav="/">Loods</div>
+      <div class="navtab ${active==='klanten'?'active':''}" data-nav="/klanten">Klanten (${cache.customers.length})</div>
+    </div>`;
+}
+
+function headerHtml(kind){
+  const isKlant = kind === 'klant';
+  return `
+    <header class="top">
+      <div class="brand">
+        <div class="dial ${isKlant?'klant':''}"><div class="dial-inner"><div class="r">${isKlant?KLANT_RATIO_IN:RATIO_IN}:${isKlant?KLANT_RATIO_OUT:RATIO_OUT}</div><div class="l">ratio</div></div></div>
+        <div>
+          <h1>Loods 25</h1>
+          <p>Gezamenlijk voorraadmanifest</p>
+        </div>
+      </div>
+      <span class="syncdot"><span class="d"></span>live gedeeld</span>
+    </header>`;
+}
+
+// ---------- LOGIN VIEW ----------
+function loginView(){
+  const tagsHtml = cache.users.map(u => `
+    <div class="avatar-tile ${u.claimed ? '' : 'unclaimed'}" data-select="${u.id}">
+      <div class="avatar-circle">${escapeHtml(u.name.charAt(0).toUpperCase())}</div>
+      <div class="nm">${escapeHtml(u.name)}</div>
+      <div class="st"><span class="dot"></span>${u.claimed ? 'actief' : 'nog vrij'}</div>
+    </div>
+  `).join('');
+  const addTile = cache.users.length < MAX_USERS ? `
+    <div class="avatar-tile add" data-add="1">
+      <div class="avatar-circle">+</div>
+      <div class="nm">Nieuw</div>
+      <div class="st">profiel</div>
+    </div>` : '';
+
+  return `
+    ${headerHtml()}
+    <div class="login-shell">
+      <h2>Wie ben jij?</h2>
+      <p class="sub">Kies je profiel en meld je aan met je code.<br>Nog geen profiel? Maak er zelf een aan (max ${MAX_USERS} in totaal — nu ${cache.users.length}).</p>
+      <div class="avatar-grid">${tagsHtml}${addTile}</div>
+    </div>
+    <div id="modal-slot"></div>
+  `;
+}
+
+// ---------- DASHBOARD VIEW (loods) ----------
+function dashboardView(){
+  const me = getUser(session);
+  const totalIngelegd = cache.users.reduce((s,u)=>s+u.total_ingelegd,0);
+  const totalZakjesToegekend = cache.users.reduce((s,u)=>s+zakjesVoor(u.total_ingelegd),0);
+  const totalOpgehaald = cache.users.reduce((s,u)=>s+u.opgehaald,0);
+  const myZakjes = zakjesVoor(me.total_ingelegd);
+  const myTegoed = myZakjes - me.opgehaald;
+
+  const rows = [...cache.users].sort((a,b)=> (zakjesVoor(b.total_ingelegd)-b.opgehaald) - (zakjesVoor(a.total_ingelegd)-a.opgehaald))
+    .map(u => {
+      const z = zakjesVoor(u.total_ingelegd);
+      const tegoed = z - u.opgehaald;
+      return `<tr class="${u.id===me.id?'me':''}">
+        <td>${escapeHtml(u.name)}</td>
+        <td class="num">${u.total_ingelegd}</td>
+        <td class="num">${z}</td>
+        <td class="num">${u.opgehaald}</td>
+        <td class="num tegoed">${tegoed}</td>
+      </tr>`;
+    }).join('');
+
+  const logEntries = cache.log.map(e => {
+    if(e.type === 'inleg'){
+      return `<div class="entry inleg">
+        <div class="ts">${fmtTs(e.ts)}</div>
+        <div class="desc"><b>${escapeHtml(e.user_name)}</b> legde ${e.amount} planten in
+          <span class="sub">totaal ${e.cumulative_after} planten · zakjes toegekend: ${e.zakjes_after}</span>
+        </div>
+        <div class="delta">+${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'}</div>
+      </div>`;
+    }
+    return `<div class="entry ophalen">
+      <div class="ts">${fmtTs(e.ts)}</div>
+      <div class="desc"><b>${escapeHtml(e.user_name)}</b> haalde zakjes op
+        <span class="sub">resterend tegoed: ${e.tegoed_after}</span>
+      </div>
+      <div class="delta">−${e.amount} zakje${e.amount===1?'':'s'}</div>
+    </div>`;
+  }).join('');
+
+  return `
+    ${headerHtml()}
+    ${navTabsHtml('loods')}
+
+    <div class="who">
+      <div class="name">${escapeHtml(me.name)}<span>${myTegoed} zakje${myTegoed===1?'':'s'} tegoed op dit moment</span></div>
+      <button class="btn secondary" data-logout="1">Uitloggen</button>
+    </div>
+
+    <div class="totals" style="margin-bottom:22px;">
+      <div class="t"><div class="n">${totalIngelegd}</div><div class="l">planten in loods</div></div>
+      <div class="t"><div class="n">${totalZakjesToegekend}</div><div class="l">zakjes toegekend</div></div>
+      <div class="t"><div class="n">${totalOpgehaald}</div><div class="l">al opgehaald</div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h2>Planten inleggen</h2>
+        <p class="hint">Geef door hoeveel planten je in de loods hebt gelegd. Wordt meteen opgeteld bij het totaal (${me.total_ingelegd} nu) en omgerekend: elke ${RATIO_IN} planten leveren ${RATIO_OUT} zakje op.</p>
+        <label for="in-amount">Aantal planten</label>
+        <input type="number" id="in-amount" min="1" step="1" placeholder="bv. 120">
+        <div class="preview" id="in-preview"></div>
+        <div style="margin-top:14px;"><button class="btn block" id="in-submit">Inleg registreren</button></div>
+        <div class="err" id="in-err"></div>
+      </div>
+
+      <div class="card">
+        <h2>Zakjes ophalen</h2>
+        <p class="hint">Je hebt nu <b class="mono" style="color:var(--lime)">${myTegoed}</b> zakje${myTegoed===1?'':'s'} tegoed. Registreer hier hoeveel je meeneemt zodat iedereen kan zien wat er nog in de loods ligt.</p>
+        <label for="out-amount">Aantal zakjes ophalen</label>
+        <input type="number" id="out-amount" min="1" step="1" max="${myTegoed}" placeholder="bv. 20" ${myTegoed<=0?'disabled':''}>
+        <div style="margin-top:14px;"><button class="btn block secondary" id="out-submit" ${myTegoed<=0?'disabled':''}>Ophalen registreren</button></div>
+        <div class="err" id="out-err"></div>
+      </div>
+    </div>
+
+    <div class="section-title"><h2>Overzicht per profiel</h2><span>${cache.users.length}/${MAX_USERS} profielen</span></div>
+    <div class="card" style="padding:14px 20px;">
+      <table>
+        <thead><tr><th>Naam</th><th class="num">Ingelegd</th><th class="num">Zakjes</th><th class="num">Opgehaald</th><th class="num">Tegoed</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+
+    <div class="section-title"><h2>Volledig logboek</h2><span>laatste ${cache.log.length} registraties</span></div>
+    <div class="card" style="padding:6px 20px;">
+      <div class="log">${logEntries || '<div class="empty">Nog geen registraties.</div>'}</div>
+    </div>
+
+    <footer class="note">
+      Elke inleg en elke opname wordt hier met naam en tijdstip vastgelegd — dit logboek is voor iedereen zichtbaar,
+      zodat achteraf altijd na te gaan is wie wat heeft ingelegd of opgehaald. De code (pin) voorkomt dat iemand
+      anders onder jouw naam registreert; het is geen zware beveiliging, maar wel genoeg om vergissingen en
+      misverstanden tussen jullie 25 te vermijden.
+    </footer>
+    <div id="modal-slot"></div>
+  `;
+}
+
+// ---------- KLANTEN LIST VIEW ----------
+function klantenListView(){
+  const totalGeleverd = cache.customers.reduce((s,c)=>s+c.total_geleverd,0);
+  const totalZakjes = cache.customers.reduce((s,c)=>s+zakjesVoorKlant(c.total_geleverd),0);
+
+  const rows = [...cache.customers].sort((a,b)=>a.name.localeCompare(b.name)).map(c => {
+    const z = zakjesVoorKlant(c.total_geleverd);
+    return `<tr class="clickable" data-goto-klant="${c.id}">
+      <td>${escapeHtml(c.name)}</td>
+      <td>${c.groep ? `<span class="pill">${escapeHtml(c.groep)}</span>` : ''}</td>
+      <td class="num">${c.total_geleverd}</td>
+      <td class="num tegoed">${z}</td>
+    </tr>`;
+  }).join('');
+
+  return `
+    ${headerHtml('klant')}
+    ${navTabsHtml('klanten')}
+
+    <div class="who">
+      <div class="name">${escapeHtml(getUser(session).name)}<span>ingelogd</span></div>
+      <button class="btn secondary" data-logout="1">Uitloggen</button>
+    </div>
+
+    <div class="totals" style="margin-bottom:22px;">
+      <div class="t"><div class="n">${cache.customers.length}</div><div class="l">klanten</div></div>
+      <div class="t"><div class="n">${totalGeleverd}</div><div class="l">totaal geleverd</div></div>
+      <div class="t"><div class="n">${totalZakjes}</div><div class="l">zakjes meegekregen</div></div>
+    </div>
+
+    <div class="section-title"><h2>Klantenbestand</h2><span>omrekening: ${KLANT_RATIO_IN}:${KLANT_RATIO_OUT}</span></div>
+    <div class="card">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <input type="text" class="klant-search" id="klant-search" placeholder="Zoek op naam of groep…" style="flex:1;min-width:180px;">
+        <button class="btn klant" id="klant-add">+ Nieuwe klant</button>
+      </div>
+      <p class="hint" style="margin:14px 0 0;">Iedereen in de loods kan hier klanten aanmaken en leveringen invullen — dit bestand is gezamenlijk, niet persoonlijk.</p>
+    </div>
+
+    <div class="card" style="padding:14px 20px;margin-top:16px;">
+      <table id="klant-table">
+        <thead><tr><th>Naam</th><th>Groep</th><th class="num">Geleverd</th><th class="num">Zakjes</th></tr></thead>
+        <tbody id="klant-tbody">${rows || ''}</tbody>
+      </table>
+      ${cache.customers.length===0 ? '<div class="empty">Nog geen klanten aangemaakt.</div>' : ''}
+    </div>
+    <div id="modal-slot"></div>
+  `;
+}
+
+// ---------- KLANT DETAIL VIEW (eigen pagina) ----------
+function klantDetailView(k, klantLog){
+  const z = zakjesVoorKlant(k.total_geleverd);
+
+  const entries = klantLog.map(e => {
+    return `<div class="entry levering">
+      <div class="ts">${fmtTs(e.ts)}</div>
+      <div class="desc">${e.amount} geleverd — ingevuld door <b>${escapeHtml(e.by_user_name)}</b>
+        <span class="sub">totaal ${e.cumulative_after} · direct meegekregen: ${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'}</span>
+      </div>
+      <div class="delta">+${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'}</div>
+    </div>`;
+  }).join('');
+
+  return `
+    ${headerHtml('klant')}
+    ${navTabsHtml('klanten')}
+    <button class="back-link" data-goto="/klanten">&larr; Terug naar klantenbestand</button>
+
+    <div class="klant-head">
+      <div>
+        <h1>${escapeHtml(k.name)}</h1>
+        <div class="meta">
+          ${k.groep ? `<span class="pill">${escapeHtml(k.groep)}</span>` : ''}
+          ${k.phone ? `<a href="tel:${escapeHtml(k.phone)}">${escapeHtml(k.phone)}</a>` : '<span>geen telefoonnummer</span>'}
+        </div>
+      </div>
+      <div class="totals">
+        <div class="t"><div class="n">${k.total_geleverd}</div><div class="l">geleverd</div></div>
+        <div class="t"><div class="n tegoed">${z}</div><div class="l">zakjes meegekregen</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Levering registreren</h2>
+      <p class="hint">Vul in hoeveel ${escapeHtml(k.name)} geleverd heeft. Wordt opgeteld bij het totaal (${k.total_geleverd} nu). Bij klanten geldt: elke ${KLANT_RATIO_IN} geleverd = ${KLANT_RATIO_OUT} zakje, en die krijgen ze er meteen bij mee — er wordt dus niets tegoed gehouden.</p>
+      <label for="kl-amount">Aantal geleverd</label>
+      <input type="number" id="kl-amount" min="1" step="1" placeholder="bv. 40">
+      <div class="preview" id="kl-preview"></div>
+      <div style="margin-top:14px;"><button class="btn klant block" id="kl-submit">Registreren</button></div>
+      <div class="err" id="kl-err"></div>
+    </div>
+
+    <div class="section-title"><h2>Geschiedenis van ${escapeHtml(k.name)}</h2><span>${klantLog.length} registraties</span></div>
+    <div class="card" style="padding:6px 20px;">
+      <div class="log">${entries || '<div class="empty">Nog geen registraties voor deze klant.</div>'}</div>
+    </div>
+    <div id="modal-slot"></div>
+  `;
+}
+
+// ---------- modals ----------
+function showModal(html){
+  document.getElementById('modal-slot').innerHTML = `<div class="modal-bg" id="modal-bg">${html}</div>`;
+  document.getElementById('modal-bg').addEventListener('click', (e)=>{ if(e.target.id==='modal-bg') closeModal(); });
+}
+function closeModal(){
+  const slot = document.getElementById('modal-slot');
+  if(slot) slot.innerHTML = '';
+}
+
+function claimModal(user){
+  showModal(`<div class="modal">
+    <h3>${escapeHtml(user.name)} claimen</h3>
+    <p class="hint">Dit profiel is nog niet in gebruik. Stel een code (4 cijfers of meer) in zodat alleen jij hierop kan inloggen.</p>
+    <label>Nieuwe code</label>
+    <input type="password" inputmode="numeric" id="claim-pin" placeholder="••••" maxlength="8">
+    <div class="err" id="claim-err"></div>
+    <div class="row-btns">
+      <button class="btn secondary" id="claim-cancel" style="flex:1">Annuleren</button>
+      <button class="btn" id="claim-ok" style="flex:1">Profiel claimen</button>
+    </div>
+  </div>`);
+  document.getElementById('claim-cancel').onclick = closeModal;
+  document.getElementById('claim-ok').onclick = async () => {
+    const pin = document.getElementById('claim-pin').value.trim();
+    const err = document.getElementById('claim-err');
+    if(pin.length < 4){ err.textContent = 'Kies een code van minstens 4 tekens.'; return; }
+    const pinHash = await hashPin(pin);
+    const { error } = await sb.rpc('fn_claim_profile', { p_user_id: user.id, p_pin_hash: pinHash });
+    if(error){ err.textContent = friendlyError(error); return; }
+    session = user.id;
+    localStorage.setItem(SESSION_KEY, session);
+    closeModal();
+    goTo('/');
+    render();
+  };
+}
+
+function loginModal(user){
+  showModal(`<div class="modal">
+    <h3>Inloggen als ${escapeHtml(user.name)}</h3>
+    <p class="hint">Voer je code in.</p>
+    <label>Code</label>
+    <input type="password" inputmode="numeric" id="login-pin" placeholder="••••" maxlength="8">
+    <div class="err" id="login-err"></div>
+    <div class="row-btns">
+      <button class="btn secondary" id="login-cancel" style="flex:1">Annuleren</button>
+      <button class="btn" id="login-ok" style="flex:1">Inloggen</button>
+    </div>
+  </div>`);
+  document.getElementById('login-cancel').onclick = closeModal;
+  const tryLogin = async () => {
+    const pin = document.getElementById('login-pin').value.trim();
+    const err = document.getElementById('login-err');
+    const pinHash = await hashPin(pin);
+    const { data, error } = await sb.rpc('fn_verify_login', { p_user_id: user.id, p_pin_hash: pinHash });
+    if(error || !data){ err.textContent = 'Onjuiste code, probeer opnieuw.'; return; }
+    session = user.id;
+    localStorage.setItem(SESSION_KEY, session);
+    closeModal();
+    goTo('/');
+    render();
+  };
+  document.getElementById('login-ok').onclick = tryLogin;
+  document.getElementById('login-pin').addEventListener('keydown', e => { if(e.key==='Enter') tryLogin(); });
+}
+
+function addProfileModal(){
+  showModal(`<div class="modal">
+    <h3>Nieuw profiel</h3>
+    <p class="hint">Er is plaats voor ${MAX_USERS - cache.users.length} extra profiel(en).</p>
+    <label>Naam</label>
+    <input type="text" id="add-name" maxlength="24" placeholder="bv. tibo">
+    <label>Code</label>
+    <input type="password" inputmode="numeric" id="add-pin" placeholder="••••" maxlength="8">
+    <div class="err" id="add-err"></div>
+    <div class="row-btns">
+      <button class="btn secondary" id="add-cancel" style="flex:1">Annuleren</button>
+      <button class="btn" id="add-ok" style="flex:1">Aanmaken</button>
+    </div>
+  </div>`);
+  document.getElementById('add-cancel').onclick = closeModal;
+  document.getElementById('add-ok').onclick = async () => {
+    const name = document.getElementById('add-name').value.trim();
+    const pin = document.getElementById('add-pin').value.trim();
+    const err = document.getElementById('add-err');
+    if(!name){ err.textContent = 'Geef een naam op.'; return; }
+    if(pin.length < 4){ err.textContent = 'Kies een code van minstens 4 tekens.'; return; }
+    const pinHash = await hashPin(pin);
+    const { data, error } = await sb.rpc('fn_create_profile', { p_name: name, p_pin_hash: pinHash });
+    if(error){ err.textContent = friendlyError(error); return; }
+    session = data.id;
+    localStorage.setItem(SESSION_KEY, session);
+    closeModal();
+    goTo('/');
+    render();
+  };
+}
+
+function addKlantModal(){
+  showModal(`<div class="modal">
+    <h3>Nieuwe klant</h3>
+    <p class="hint">Maak een klantenpagina aan. Iedereen in de loods kan hier later leveringen op registreren.</p>
+    <label>Naam</label>
+    <input type="text" id="kadd-name" maxlength="60" placeholder="bv. Café De Kroon">
+    <label>Telefoonnummer</label>
+    <input type="tel" id="kadd-phone" maxlength="30" placeholder="bv. 0470 12 34 56">
+    <label>Groep</label>
+    <input type="text" id="kadd-groep" maxlength="40" placeholder="bv. Noord">
+    <div class="err" id="kadd-err"></div>
+    <div class="row-btns">
+      <button class="btn secondary" id="kadd-cancel" style="flex:1">Annuleren</button>
+      <button class="btn klant" id="kadd-ok" style="flex:1">Aanmaken</button>
+    </div>
+  </div>`);
+  document.getElementById('kadd-cancel').onclick = closeModal;
+  document.getElementById('kadd-ok').onclick = async () => {
+    const name = document.getElementById('kadd-name').value.trim();
+    const phone = document.getElementById('kadd-phone').value.trim();
+    const groep = document.getElementById('kadd-groep').value.trim();
+    const err = document.getElementById('kadd-err');
+    if(!name){ err.textContent = 'Geef een naam op.'; return; }
+    const me = getUser(session);
+    const { data, error } = await sb.rpc('fn_create_klant', { p_name: name, p_phone: phone, p_groep: groep, p_created_by: me.name });
+    if(error){ err.textContent = friendlyError(error); return; }
+    closeModal();
+    goTo('/klant/' + data.id);
+    render();
+  };
+}
+
+// ---------- event wiring: login screen ----------
+function attachLoginHandlers(){
+  document.querySelectorAll('[data-select]').forEach(el => {
+    el.addEventListener('click', () => {
+      const u = getUser(el.getAttribute('data-select'));
+      if(!u) return;
+      if(u.claimed) loginModal(u); else claimModal(u);
+    });
+  });
+  const addTile = document.querySelector('[data-add]');
+  if(addTile) addTile.addEventListener('click', addProfileModal);
+}
+
+// ---------- event wiring: common (nav + logout) ----------
+function attachCommonHandlers(){
+  document.querySelectorAll('[data-nav]').forEach(el=>{
+    el.addEventListener('click', ()=> goTo(el.getAttribute('data-nav')));
+  });
+  document.querySelectorAll('[data-goto]').forEach(el=>{
+    el.addEventListener('click', ()=> goTo(el.getAttribute('data-goto')));
+  });
+  const logoutBtn = document.querySelector('[data-logout]');
+  if(logoutBtn) logoutBtn.addEventListener('click', () => {
+    session = null;
+    localStorage.removeItem(SESSION_KEY);
+    goTo('/');
+    render();
+  });
+}
+
+// ---------- event wiring: loods dashboard ----------
+function attachDashboardHandlers(){
+  attachCommonHandlers();
+
+  const inAmount = document.getElementById('in-amount');
+  if(inAmount){
+    const preview = document.getElementById('in-preview');
+    inAmount.addEventListener('input', () => {
+      const v = parseInt(inAmount.value, 10);
+      if(!v || v <= 0){ preview.innerHTML=''; return; }
+      const me = getUser(session);
+      const newTotal = me.total_ingelegd + v;
+      const newZakjes = zakjesVoor(newTotal);
+      const delta = newZakjes - zakjesVoor(me.total_ingelegd);
+      preview.innerHTML = `Nieuw totaal: <b>${newTotal}</b> planten → jij krijgt er <b>+${delta}</b> zakje${delta===1?'':'s'} bij.`;
+    });
+    document.getElementById('in-submit').addEventListener('click', async () => {
+      const v = parseInt(inAmount.value, 10);
+      const err = document.getElementById('in-err');
+      if(!v || v <= 0){ err.textContent = 'Voer een geldig aantal planten in.'; return; }
+      const { error } = await sb.rpc('fn_register_inleg', { p_user_id: session, p_amount: v });
+      if(error){ err.textContent = friendlyError(error); return; }
+      render();
+    });
+  }
+
+  const outAmount = document.getElementById('out-amount');
+  if(outAmount){
+    document.getElementById('out-submit').addEventListener('click', async () => {
+      const v = parseInt(outAmount.value, 10);
+      const err = document.getElementById('out-err');
+      if(!v || v <= 0){ err.textContent = 'Voer een geldig aantal zakjes in.'; return; }
+      const { error } = await sb.rpc('fn_register_ophalen', { p_user_id: session, p_amount: v });
+      if(error){ err.textContent = friendlyError(error); return; }
+      render();
+    });
+  }
+}
+
+// ---------- event wiring: klanten list ----------
+function attachKlantenListHandlers(){
+  attachCommonHandlers();
+  document.getElementById('klant-add').addEventListener('click', addKlantModal);
+
+  document.querySelectorAll('[data-goto-klant]').forEach(el=>{
+    el.addEventListener('click', ()=> goTo('/klant/' + el.getAttribute('data-goto-klant')));
+  });
+
+  const search = document.getElementById('klant-search');
+  search.addEventListener('input', () => {
+    const q = search.value.trim().toLowerCase();
+    const rows = [...cache.customers].sort((a,b)=>a.name.localeCompare(b.name)).filter(c =>
+      c.name.toLowerCase().includes(q) || (c.groep||'').toLowerCase().includes(q)
+    ).map(c => {
+      const z = zakjesVoorKlant(c.total_geleverd);
+      return `<tr class="clickable" data-goto-klant="${c.id}">
+        <td>${escapeHtml(c.name)}</td>
+        <td>${c.groep ? `<span class="pill">${escapeHtml(c.groep)}</span>` : ''}</td>
+        <td class="num">${c.total_geleverd}</td>
+        <td class="num tegoed">${z}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('klant-tbody').innerHTML = rows;
+    document.querySelectorAll('[data-goto-klant]').forEach(el=>{
+      el.addEventListener('click', ()=> goTo('/klant/' + el.getAttribute('data-goto-klant')));
+    });
+  });
+}
+
+// ---------- event wiring: klant detail ----------
+function attachKlantDetailHandlers(k){
+  attachCommonHandlers();
+
+  const klAmount = document.getElementById('kl-amount');
+  const preview = document.getElementById('kl-preview');
+  klAmount.addEventListener('input', () => {
+    const v = parseInt(klAmount.value, 10);
+    if(!v || v <= 0){ preview.innerHTML=''; return; }
+    const newTotal = k.total_geleverd + v;
+    const newZakjes = zakjesVoorKlant(newTotal);
+    const delta = newZakjes - zakjesVoorKlant(k.total_geleverd);
+    preview.innerHTML = `Nieuw totaal: <b>${newTotal}</b> → er komt <b>+${delta}</b> zakje${delta===1?'':'s'} bij.`;
+  });
+  document.getElementById('kl-submit').addEventListener('click', async () => {
+    const v = parseInt(klAmount.value, 10);
+    const err = document.getElementById('kl-err');
+    if(!v || v <= 0){ err.textContent = 'Voer een geldig aantal in.'; return; }
+    const me = getUser(session);
+    const { error } = await sb.rpc('fn_register_levering', { p_customer_id: k.id, p_amount: v, p_by_user_id: me.id, p_by_user_name: me.name });
+    if(error){ err.textContent = friendlyError(error); return; }
+    render();
+  });
+}
+
+boot();
+</script>
+</body>
+</html>
