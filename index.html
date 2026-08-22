@@ -215,6 +215,7 @@ footer.note{margin-top:38px;color:var(--muted);font-size:11.5px;line-height:1.65
 </head>
 <body>
 <div class="wrap" id="app"></div>
+<div id="modal-root"></div>
 
 <!-- Supabase JS client (UMD build, geen npm/build-stap nodig) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -416,7 +417,6 @@ function loginView(){
       <p class="sub">Kies je profiel en meld je aan met je code.<br>Nog geen profiel? Maak er zelf een aan (max ${MAX_USERS} in totaal — nu ${cache.users.length}).</p>
       <div class="avatar-grid">${tagsHtml}${addTile}</div>
     </div>
-    <div id="modal-slot"></div>
   `;
 }
 
@@ -516,7 +516,6 @@ function dashboardView(){
       anders onder jouw naam registreert; het is geen zware beveiliging, maar wel genoeg om vergissingen en
       misverstanden tussen jullie 25 te vermijden.
     </footer>
-    <div id="modal-slot"></div>
   `;
 }
 
@@ -566,7 +565,6 @@ function klantenListView(){
       </table>
       ${cache.customers.length===0 ? '<div class="empty">Nog geen klanten aangemaakt.</div>' : ''}
     </div>
-    <div id="modal-slot"></div>
   `;
 }
 
@@ -617,18 +615,17 @@ function klantDetailView(k, klantLog){
     <div class="card" style="padding:6px 20px;">
       <div class="log">${entries || '<div class="empty">Nog geen registraties voor deze klant.</div>'}</div>
     </div>
-    <div id="modal-slot"></div>
   `;
 }
 
 // ---------- modals ----------
 function showModal(html){
-  document.getElementById('modal-slot').innerHTML = `<div class="modal-bg" id="modal-bg">${html}</div>`;
+  document.getElementById('modal-root').innerHTML = `<div class="modal-bg" id="modal-bg">${html}</div>`;
   document.getElementById('modal-bg').addEventListener('click', (e)=>{ if(e.target.id==='modal-bg') closeModal(); });
 }
 function closeModal(){
-  const slot = document.getElementById('modal-slot');
-  if(slot) slot.innerHTML = '';
+  const root = document.getElementById('modal-root');
+  if(root) root.innerHTML = '';
 }
 
 function claimModal(user){
