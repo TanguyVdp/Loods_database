@@ -1,10 +1,11 @@
-# Loods 25 — setup & hosting
+# Wietloods — setup & hosting
 
 Zelfstandige webapp (geen build-stap, geen framework) met een gedeelde
 Supabase-database. Iedereen opent gewoon de link, geen Claude-account nodig.
 
 - `index.html` — de volledige app (HTML + CSS + JS in één bestand, zelfde stijl als het origineel)
 - `supabase/schema.sql` — database-tabellen + functies, eenmalig uit te voeren
+- `supabase/update-boss-menu.sql` — extra update: bosscode + Boss menu (na schema.sql uitvoeren)
 
 ## 1. Supabase-project aanmaken (database)
 
@@ -69,6 +70,20 @@ automatisch binnen een minuut.
   groep van 25 mensen. Let op: een gratis Supabase-project pauzeert na 7
   dagen zonder verkeer — gewoon de site openen maakt hem weer wakker (kan
   de allereerste keer na een lange stilte een paar seconden duren).
+
+## Boss menu
+
+Naast "live gedeeld" bovenaan staat een knop **Boss menu**, vergrendeld met
+een eigen bosscode (los van ieders persoonlijke profielcode). Wie de code
+kent ziet een overzicht per persoon (ingelegd/opgehaald/geleverd aan
+klanten) en het volledige logboek van alle 25 profielen samen, filterbaar
+op persoon.
+
+Stel de bosscode in via `supabase/update-boss-menu.sql` (regel met
+`encode(digest('2525', 'sha256'), ...)` — vervang `'2525'` door je eigen
+code) en voer dat bestand eenmalig uit in de SQL Editor, na `schema.sql`.
+Je kan de code later wijzigen door diezelfde regel opnieuw uit te voeren
+met een nieuwe waarde.
 
 ## Lokaal testen (optioneel)
 

@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<title>Loods 25 — Voorraadmanifest</title>
+<title>Wietloods — Voorraadmanifest</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap');
@@ -139,6 +139,9 @@ button{cursor:pointer;font-family:'Inter',sans-serif;touch-action:manipulation;}
 .btn.secondary:hover{border-color:var(--border-hi);box-shadow:none;transform:none;filter:none;background:var(--glass-hi);}
 .btn.block{width:100%;}
 .btn:disabled{opacity:0.35;cursor:not-allowed;transform:none;box-shadow:none;}
+.btn.small{padding:8px 14px;font-size:11.5px;min-height:34px;border-radius:10px;}
+.btn.boss{background:var(--grad-b);}
+.btn.boss:hover{box-shadow:0 8px 20px rgba(154,134,255,0.25);}
 
 /* ---------- dashboard ---------- */
 .who{display:flex;align-items:center;justify-content:space-between;background:var(--glass);
@@ -160,6 +163,9 @@ button{cursor:pointer;font-family:'Inter',sans-serif;touch-action:manipulation;}
   border:1px solid var(--border);border-radius:12px;color:var(--cream);
   padding:11px 13px;font-family:'Space Mono',monospace;font-size:16px;}
 .card input:focus{outline:none;border-color:var(--lime);box-shadow:0 0 0 3px rgba(182,255,60,0.12);}
+select.select-field{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;color:var(--cream);
+  padding:11px 13px;font-family:'Inter',sans-serif;font-size:15px;}
+select.select-field:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px rgba(154,134,255,0.12);}
 .preview{margin-top:11px;font-size:12px;color:var(--muted);min-height:16px;}
 .preview b{color:var(--lime);font-family:'Space Mono',monospace;}
 
@@ -235,6 +241,7 @@ const RATIO_IN = 2, RATIO_OUT = 1;             // leden: 2 planten -> 1 zakje
 const KLANT_RATIO_IN = 4, KLANT_RATIO_OUT = 1; // klanten: 4 geleverd -> 1 zakje
 const MAX_USERS = 25;
 const SESSION_KEY = "loods25-session";
+const BOSS_KEY = "wietloods-boss-session";
 
 let cache = { users: [], log: [], customers: [] }; // laatst opgehaalde data, voor previews
 let session = localStorage.getItem(SESSION_KEY) || null; // ingelogde user id
@@ -306,14 +313,26 @@ async function fetchCustomerLog(customerId, limit=100){
   if(error){ console.error(error); return []; }
   return data;
 }
+async function fetchAllLoodsLog(limit=2000){
+  const { data, error } = await sb.from('loods_log').select('*').order('ts',{ascending:false}).limit(limit);
+  if(error){ console.error(error); return []; }
+  return data;
+}
+async function fetchAllCustomerLog(limit=2000){
+  const { data, error } = await sb.from('customer_log').select('*').order('ts',{ascending:false}).limit(limit);
+  if(error){ console.error(error); return []; }
+  return data;
+}
 function getUser(id){ return cache.users.find(u => u.id === id); }
+function getKlant(id){ return cache.customers.find(c => c.id === id); }
 function clearSessionIfMissing(){
   if(session && !getUser(session)){ session = null; localStorage.removeItem(SESSION_KEY); }
 }
+function isBossUnlocked(){ return sessionStorage.getItem(BOSS_KEY) === '1'; }
 
 // ---------- boot ----------
 async function boot(){
-  render(`<div class="empty">Loods wordt geopend…</div>`);
+  render(`<div class="empty">Wietloods wordt geopend…</div>`);
   await render();
   window.addEventListener('hashchange', render);
   setupRealtime();
@@ -342,6 +361,24 @@ async function render(overrideHtml){
   cache.users = await fetchUsers();
   clearSessionIfMissing();
 
+  const path = getHash();
+
+  if(path[0] === 'boss'){
+    if(!isBossUnlocked()){
+      if(mySeq !== renderSeq) return;
+      app.innerHTML = bossLockedView();
+      attachBossLockedHandlers();
+      return;
+    }
+    cache.customers = await fetchCustomers();
+    const allLog = await fetchAllLoodsLog();
+    const allCustLog = await fetchAllCustomerLog();
+    if(mySeq !== renderSeq) return;
+    app.innerHTML = bossView(allLog, allCustLog);
+    attachBossHandlers();
+    return;
+  }
+
   if(!session){
     if(mySeq !== renderSeq) return;
     app.innerHTML = loginView();
@@ -349,7 +386,6 @@ async function render(overrideHtml){
     return;
   }
 
-  const path = getHash();
   cache.customers = await fetchCustomers();
 
   if(path[0] === 'klanten'){
@@ -386,11 +422,14 @@ function headerHtml(kind){
       <div class="brand">
         <div class="dial ${isKlant?'klant':''}"><div class="dial-inner"><div class="r">${isKlant?KLANT_RATIO_IN:RATIO_IN}:${isKlant?KLANT_RATIO_OUT:RATIO_OUT}</div><div class="l">ratio</div></div></div>
         <div>
-          <h1>Loods 25</h1>
+          <h1>Wietloods</h1>
           <p>Gezamenlijk voorraadmanifest</p>
         </div>
       </div>
-      <span class="syncdot"><span class="d"></span>live gedeeld</span>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span class="syncdot"><span class="d"></span>live gedeeld</span>
+        <button class="btn boss small" data-boss="1">Boss menu</button>
+      </div>
     </header>`;
 }
 
@@ -749,6 +788,148 @@ function addKlantModal(){
   };
 }
 
+// ---------- boss menu ----------
+function bossCodeModal(){
+  showModal(`<div class="modal">
+    <h3>Boss menu</h3>
+    <p class="hint">Voer de bosscode in om het volledige logboek en overzicht per persoon te bekijken.</p>
+    <label>Bosscode</label>
+    <input type="password" inputmode="numeric" id="boss-pin" placeholder="••••" maxlength="16">
+    <div class="err" id="boss-err"></div>
+    <div class="row-btns">
+      <button class="btn secondary" id="boss-cancel" style="flex:1">Annuleren</button>
+      <button class="btn boss" id="boss-ok" style="flex:1">Ontgrendelen</button>
+    </div>
+  </div>`);
+  document.getElementById('boss-cancel').onclick = closeModal;
+  const tryBoss = async () => {
+    const pin = document.getElementById('boss-pin').value.trim();
+    const err = document.getElementById('boss-err');
+    if(!pin){ err.textContent = 'Voer een code in.'; return; }
+    const pinHash = await hashPin(pin);
+    const { data, error } = await sb.rpc('fn_verify_boss', { p_pin_hash: pinHash });
+    if(error || !data){ err.textContent = 'Onjuiste bosscode.'; return; }
+    sessionStorage.setItem(BOSS_KEY, '1');
+    closeModal();
+    goTo('/boss');
+    render();
+  };
+  document.getElementById('boss-ok').onclick = tryBoss;
+  document.getElementById('boss-pin').addEventListener('keydown', e => { if(e.key==='Enter') tryBoss(); });
+}
+
+function bossLockedView(){
+  return `
+    ${headerHtml()}
+    <div class="login-shell">
+      <h2>Boss menu</h2>
+      <p class="sub">Dit gedeelte is vergrendeld met een aparte bosscode, los van je persoonlijke profielcode.</p>
+      <button class="btn boss" id="boss-unlock" style="max-width:220px;margin:0 auto;">Code invoeren</button>
+    </div>
+  `;
+}
+function attachBossLockedHandlers(){
+  attachCommonHandlers();
+  document.getElementById('boss-unlock').addEventListener('click', bossCodeModal);
+}
+
+let bossMerged = []; // laatst opgebouwde gefilterde logboek-lijst, voor de filter-dropdown
+
+function bossLogEntriesHtml(list){
+  if(!list.length) return '<div class="empty">Geen registraties.</div>';
+  return list.map(e => `
+    <div class="entry ${e.cls}">
+      <div class="ts">${fmtTs(e.ts)}</div>
+      <div class="desc"><b>${escapeHtml(e.person)}</b> ${e.label}</div>
+      <div class="delta">${e.delta}</div>
+    </div>
+  `).join('');
+}
+
+function bossView(allLog, allCustLog){
+  const persons = [...cache.users].map(u => u.name).sort((a,b)=>a.localeCompare(b));
+
+  bossMerged = [
+    ...allLog.map(e => ({
+      ts: e.ts, person: e.user_name, cls: e.type,
+      label: e.type === 'inleg'
+        ? `legde ${e.amount} planten in <span class="sub">totaal ${e.cumulative_after} · zakjes toegekend: ${e.zakjes_after}</span>`
+        : `haalde ${e.amount} zakje${e.amount===1?'':'s'} op <span class="sub">resterend tegoed: ${e.tegoed_after}</span>`,
+      delta: e.type === 'inleg' ? `+${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'}` : `−${e.amount} zakje${e.amount===1?'':'s'}`
+    })),
+    ...allCustLog.map(e => {
+      const klant = getKlant(e.customer_id);
+      return {
+        ts: e.ts, person: e.by_user_name, cls: 'levering',
+        label: `leverde ${e.amount} aan <b>${escapeHtml(klant ? klant.name : 'verwijderde klant')}</b> <span class="sub">totaal klant ${e.cumulative_after} · +${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'} meegekregen</span>`,
+        delta: `+${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'}`
+      };
+    })
+  ].sort((a,b) => new Date(b.ts) - new Date(a.ts));
+
+  const summary = persons.map(name => {
+    const u = cache.users.find(x => x.name === name);
+    const geleverd = allCustLog.filter(e => e.by_user_name === name).reduce((s,e)=>s+e.amount, 0);
+    return {
+      name,
+      ingelegd: u ? u.total_ingelegd : 0,
+      opgehaald: u ? u.opgehaald : 0,
+      geleverd
+    };
+  });
+
+  return `
+    ${headerHtml()}
+    <div class="who">
+      <div class="name">Boss menu<span>volledig overzicht van alle ${persons.length} profielen</span></div>
+      <button class="btn secondary" data-boss-lock="1">Vergrendelen</button>
+    </div>
+
+    <div class="section-title"><h2>Overzicht per persoon</h2><span>${persons.length} leden</span></div>
+    <div class="card" style="padding:14px 20px;">
+      <table>
+        <thead><tr><th>Naam</th><th class="num">Ingelegd</th><th class="num">Opgehaald</th><th class="num">Geleverd aan klanten</th></tr></thead>
+        <tbody>${summary.map(s => `<tr>
+          <td>${escapeHtml(s.name)}</td>
+          <td class="num">${s.ingelegd}</td>
+          <td class="num">${s.opgehaald}</td>
+          <td class="num">${s.geleverd}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+
+    <div class="section-title"><h2>Volledig logboek</h2><span>${bossMerged.length} registraties</span></div>
+    <div class="card">
+      <label for="boss-filter">Filter op persoon</label>
+      <select id="boss-filter" class="select-field">
+        <option value="">Iedereen</option>
+        ${persons.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="card" style="padding:6px 20px;margin-top:16px;">
+      <div class="log" id="boss-log">${bossLogEntriesHtml(bossMerged)}</div>
+    </div>
+  `;
+}
+
+function attachBossHandlers(){
+  attachCommonHandlers();
+  const lockBtn = document.querySelector('[data-boss-lock]');
+  if(lockBtn) lockBtn.addEventListener('click', () => {
+    sessionStorage.removeItem(BOSS_KEY);
+    goTo('/');
+    render();
+  });
+  const filter = document.getElementById('boss-filter');
+  if(filter){
+    filter.addEventListener('change', () => {
+      const val = filter.value;
+      const filtered = val ? bossMerged.filter(e => e.person === val) : bossMerged;
+      document.getElementById('boss-log').innerHTML = bossLogEntriesHtml(filtered);
+    });
+  }
+}
+
 // ---------- event wiring: login screen ----------
 function attachLoginHandlers(){
   document.querySelectorAll('[data-select]').forEach(el => {
@@ -769,6 +950,11 @@ function attachCommonHandlers(){
   });
   document.querySelectorAll('[data-goto]').forEach(el=>{
     el.addEventListener('click', ()=> goTo(el.getAttribute('data-goto')));
+  });
+  document.querySelectorAll('[data-boss]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      if(isBossUnlocked()){ goTo('/boss'); render(); } else { bossCodeModal(); }
+    });
   });
   const logoutBtn = document.querySelector('[data-logout]');
   if(logoutBtn) logoutBtn.addEventListener('click', () => {
