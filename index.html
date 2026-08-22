@@ -932,6 +932,7 @@ function attachBossHandlers(){
 
 // ---------- event wiring: login screen ----------
 function attachLoginHandlers(){
+  attachCommonHandlers();
   document.querySelectorAll('[data-select]').forEach(el => {
     el.addEventListener('click', () => {
       const u = getUser(el.getAttribute('data-select'));
