@@ -143,6 +143,8 @@ button{cursor:pointer;font-family:'Inter',sans-serif;touch-action:manipulation;}
 .btn.small{padding:8px 14px;font-size:11.5px;min-height:34px;border-radius:10px;}
 .btn.boss{background:var(--grad-b);}
 .btn.boss:hover{box-shadow:0 8px 20px rgba(154,134,255,0.25);}
+.btn.danger{background:transparent;border:1px solid rgba(255,107,107,0.4);color:var(--danger);}
+.btn.danger:hover{background:rgba(255,107,107,0.1);border-color:var(--danger);box-shadow:none;transform:none;filter:none;}
 
 /* ---------- dashboard ---------- */
 .who{display:flex;align-items:center;justify-content:space-between;background:var(--glass);
@@ -259,7 +261,8 @@ const ERR_MESSAGES = {
   ONGELDIG_AANTAL: 'Voer een geldig aantal in.',
   ONVOLDOENDE_TEGOED: 'Onvoldoende tegoed.',
   KLANT_BESTAAT_AL: 'Die klant bestaat al.',
-  KLANT_NIET_GEVONDEN: 'Klant niet gevonden.'
+  KLANT_NIET_GEVONDEN: 'Klant niet gevonden.',
+  ONJUISTE_BOSSCODE: 'Bosscode klopt niet meer — ontgrendel opnieuw.'
 };
 function friendlyError(e){
   const code = (e && e.message) ? e.message.trim() : '';
@@ -330,7 +333,8 @@ function getKlant(id){ return cache.customers.find(c => c.id === id); }
 function clearSessionIfMissing(){
   if(session && !getUser(session)){ session = null; localStorage.removeItem(SESSION_KEY); }
 }
-function isBossUnlocked(){ return sessionStorage.getItem(BOSS_KEY) === '1'; }
+function isBossUnlocked(){ return !!sessionStorage.getItem(BOSS_KEY); }
+function bossPinHash(){ return sessionStorage.getItem(BOSS_KEY); }
 
 // ---------- boot ----------
 async function boot(){
@@ -811,7 +815,7 @@ function bossCodeModal(){
     const pinHash = await hashPin(pin);
     const { data, error } = await sb.rpc('fn_verify_boss', { p_pin_hash: pinHash });
     if(error || !data){ err.textContent = 'Onjuiste bosscode.'; return; }
-    sessionStorage.setItem(BOSS_KEY, '1');
+    sessionStorage.setItem(BOSS_KEY, pinHash);
     closeModal();
     goTo('/boss');
     render();
@@ -873,6 +877,7 @@ function bossView(allLog, allCustLog){
     const u = cache.users.find(x => x.name === name);
     const geleverd = allCustLog.filter(e => e.by_user_name === name).reduce((s,e)=>s+e.amount, 0);
     return {
+      id: u ? u.id : null,
       name,
       ingelegd: u ? u.total_ingelegd : 0,
       opgehaald: u ? u.opgehaald : 0,
@@ -890,12 +895,13 @@ function bossView(allLog, allCustLog){
     <div class="section-title"><h2>Overzicht per persoon</h2><span>${persons.length} leden</span></div>
     <div class="card" style="padding:14px 20px;">
       <table>
-        <thead><tr><th>Naam</th><th class="num">Ingelegd</th><th class="num">Opgehaald</th><th class="num">Geleverd aan klanten</th></tr></thead>
+        <thead><tr><th>Naam</th><th class="num">Ingelegd</th><th class="num">Opgehaald</th><th class="num">Geleverd aan klanten</th><th></th></tr></thead>
         <tbody>${summary.map(s => `<tr>
           <td>${escapeHtml(s.name)}</td>
           <td class="num">${s.ingelegd}</td>
           <td class="num">${s.opgehaald}</td>
           <td class="num">${s.geleverd}</td>
+          <td style="text-align:right;">${s.id ? `<button class="btn danger small" data-del-profile="${s.id}" data-del-name="${escapeHtml(s.name)}">Verwijderen</button>` : ''}</td>
         </tr>`).join('')}</tbody>
       </table>
     </div>
@@ -914,6 +920,13 @@ function bossView(allLog, allCustLog){
   `;
 }
 
+async function deleteProfileFromBoss(userId, userName){
+  if(!confirm(`Profiel van "${userName}" verwijderen? Het logboek blijft bewaard (met naam), enkel het inlogprofiel verdwijnt. Dit kan niet ongedaan gemaakt worden.`)) return;
+  const { error } = await sb.rpc('fn_delete_profile', { p_user_id: userId, p_boss_pin_hash: bossPinHash() });
+  if(error){ alert(friendlyError(error)); return; }
+  render();
+}
+
 function attachBossHandlers(){
   attachCommonHandlers();
   const lockBtn = document.querySelector('[data-boss-lock]');
@@ -921,6 +934,11 @@ function attachBossHandlers(){
     sessionStorage.removeItem(BOSS_KEY);
     goTo('/');
     render();
+  });
+  document.querySelectorAll('[data-del-profile]').forEach(el=>{
+    el.addEventListener('click', () => {
+      deleteProfileFromBoss(el.getAttribute('data-del-profile'), el.getAttribute('data-del-name'));
+    });
   });
   const filter = document.getElementById('boss-filter');
   if(filter){

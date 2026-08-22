@@ -6,6 +6,7 @@ Supabase-database. Iedereen opent gewoon de link, geen Claude-account nodig.
 - `index.html` — de volledige app (HTML + CSS + JS in één bestand, zelfde stijl als het origineel)
 - `supabase/schema.sql` — database-tabellen + functies, eenmalig uit te voeren
 - `supabase/update-boss-menu.sql` — extra update: bosscode + Boss menu (na schema.sql uitvoeren)
+- `supabase/update-delete-profile.sql` — extra update: profiel verwijderen vanuit Boss menu (na update-boss-menu.sql)
 
 ## 1. Supabase-project aanmaken (database)
 
@@ -84,6 +85,13 @@ Stel de bosscode in via `supabase/update-boss-menu.sql` (regel met
 code) en voer dat bestand eenmalig uit in de SQL Editor, na `schema.sql`.
 Je kan de code later wijzigen door diezelfde regel opnieuw uit te voeren
 met een nieuwe waarde.
+
+In het Boss menu kun je ook profielen verwijderen (bv. iemand die stopt).
+Dat vereist `supabase/update-delete-profile.sql` — eenmalig uitvoeren, na
+`update-boss-menu.sql`. Verwijderen controleert je bosscode ook aan de
+database-kant, dus dat kan niemand omzeilen via de browserconsole. Het
+logboek van die persoon blijft gewoon bewaard (met naam); enkel het
+inlogprofiel verdwijnt, dus die naam wordt weer vrij om opnieuw te claimen.
 
 ## Lokaal testen (optioneel)
 
