@@ -342,29 +342,43 @@ const ICONS = {
 function fmtNum(n){ return Number(n).toLocaleString('nl-BE'); }
 
 // ---------- unieke kleur per persoon (herkenbaar in avatars/tabellen/log) ----------
-const PERSON_PALETTE = [
-  ['#B6FF3C','#3FE8C8'], ['#9A86FF','#FF7FCE'], ['#FFC15C','#FF7FCE'],
-  ['#3FE8C8','#9A86FF'], ['#FF6B6B','#FFC15C'], ['#B6FF3C','#9A86FF'],
-  ['#FF7FCE','#3FE8C8'], ['#FFC15C','#B6FF3C']
-];
-function personColors(name){
-  let h = 0;
+// Elke geregistreerde gebruiker krijgt een eigen plek (op volgorde van aansluiten),
+// en elke plek krijgt een kleurtint die met de gulden hoek gespreid is over het
+// kleurenwiel — zo krijgt niemand dezelfde kleur, ook niet bij 25 profielen.
+const GOLDEN_ANGLE = 137.508;
+function hslToHex(h, s, l){
+  s /= 100; l /= 100;
+  const k = n => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  const toHex = x => Math.round(255 * x).toString(16).padStart(2, '0');
+  return '#' + toHex(f(0)) + toHex(f(8)) + toHex(f(4));
+}
+function personIndex(name){
+  const sorted = [...cache.users].sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+  const idx = sorted.findIndex(u => u.name === name);
+  if(idx >= 0) return idx;
+  // naam niet (meer) in cache.users (bv. verwijderd profiel in oud logboek) —
+  // geef toch een stabiele, ver-weg-liggende kleur zodat botsing onwaarschijnlijk is
+  let h = 1000;
   for(let i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i)) >>> 0;
-  return PERSON_PALETTE[h % PERSON_PALETTE.length];
+  return h % 500 + 500;
+}
+function personColor(name){
+  const hue = (personIndex(name) * GOLDEN_ANGLE) % 360;
+  return hslToHex(hue, 68, 62);
 }
 function personDot(name){
-  const [a] = personColors(name);
-  return `<span class="p-dot" style="background:${a};"></span>`;
+  return `<span class="p-dot" style="background:${personColor(name)};"></span>`;
 }
 
 // ---------- profielfoto: weergave, verkleinen, uploaden ----------
 function avatarCircleHtml(user, size){
-  const [a] = personColors(user.name);
   const radius = Math.max(5, Math.round(size * 0.2));
   if(user.avatar_url){
     return `<div class="avatar-photo" style="width:${size}px;height:${size}px;border-radius:${radius}px;background-image:url('${escapeHtml(user.avatar_url)}');"></div>`;
   }
-  return `<div class="avatar-photo" style="width:${size}px;height:${size}px;border-radius:${radius}px;background:${a};font-size:${Math.round(size*0.42)}px;">${escapeHtml(user.name.charAt(0).toUpperCase())}</div>`;
+  return `<div class="avatar-photo" style="width:${size}px;height:${size}px;border-radius:${radius}px;background:${personColor(user.name)};font-size:${Math.round(size*0.42)}px;">${escapeHtml(user.name.charAt(0).toUpperCase())}</div>`;
 }
 
 function downscaleImage(file, maxSize, quality){
