@@ -341,7 +341,8 @@ const ERR_MESSAGES = {
   ONVOLDOENDE_TEGOED: 'Onvoldoende tegoed.',
   KLANT_BESTAAT_AL: 'Die klant bestaat al.',
   KLANT_NIET_GEVONDEN: 'Klant niet gevonden.',
-  ONJUISTE_BOSSCODE: 'Bosscode klopt niet meer — ontgrendel opnieuw.'
+  ONJUISTE_BOSSCODE: 'Bosscode klopt niet meer — ontgrendel opnieuw.',
+  ONJUISTE_CODE: 'Huidige code klopt niet.'
 };
 function friendlyError(e){
   const code = (e && e.message) ? e.message.trim() : '';
@@ -1001,26 +1002,57 @@ function addProfileModal(){
   };
 }
 
-function avatarModal(user){
+function profileSettingsModal(user){
   showModal(`<div class="modal">
     <h3>Profielinstellingen</h3>
-    <p class="hint">Profielfoto — kies een foto, wordt automatisch verkleind voor snelle laadtijden.</p>
-    <input type="file" accept="image/*" id="avatar-file" style="margin-top:4px;color:var(--muted);font-size:12.5px;width:100%;">
-    <div class="err" id="avatar-err"></div>
+    <p class="hint">Wijzigingen gelden voor jouw eigen profiel.</p>
+
+    <label>Naam</label>
+    <input type="text" id="pset-name" maxlength="24" value="${escapeHtml(user.name)}">
+    <div class="err" id="pset-name-err"></div>
+    <div style="margin-top:9px;"><button class="btn secondary small" id="pset-name-save">Naam opslaan</button></div>
+
+    <label>Profielfoto</label>
+    <input type="file" accept="image/*" id="pset-avatar-file" style="width:100%;color:var(--muted);font-size:12.5px;">
+    <div class="err" id="pset-avatar-err"></div>
+    <div style="margin-top:9px;"><button class="btn secondary small" id="pset-avatar-save">Foto uploaden</button></div>
+
+    <label>Code wijzigen</label>
+    <input type="password" inputmode="numeric" id="pset-pin-old" placeholder="Huidige code" maxlength="8" style="margin-bottom:8px;">
+    <input type="password" inputmode="numeric" id="pset-pin-new" placeholder="Nieuwe code (min. 4 tekens)" maxlength="8">
+    <div class="err" id="pset-pin-err"></div>
+    <div style="margin-top:9px;"><button class="btn secondary small" id="pset-pin-save">Code wijzigen</button></div>
+
     <div class="row-btns">
-      <button class="btn secondary" id="avatar-cancel" style="flex:1">Annuleren</button>
-      <button class="btn" id="avatar-ok" style="flex:1">Uploaden</button>
+      <button class="btn" id="pset-close" style="flex:1">Sluiten</button>
     </div>
   </div>`);
-  document.getElementById('avatar-cancel').onclick = closeModal;
-  document.getElementById('avatar-ok').onclick = async () => {
-    const fileInput = document.getElementById('avatar-file');
-    const err = document.getElementById('avatar-err');
+
+  document.getElementById('pset-close').onclick = closeModal;
+
+  document.getElementById('pset-name-save').onclick = async () => {
+    const name = document.getElementById('pset-name').value.trim();
+    const err = document.getElementById('pset-name-err');
+    const btn = document.getElementById('pset-name-save');
+    if(!name){ err.textContent = 'Geef een naam op.'; return; }
+    btn.disabled = true;
+    const { error } = await sb.rpc('fn_update_name', { p_user_id: user.id, p_new_name: name });
+    btn.disabled = false;
+    if(error){ err.textContent = friendlyError(error); return; }
+    err.textContent = '';
+    closeModal();
+    showToast('Naam bijgewerkt.');
+    render();
+  };
+
+  document.getElementById('pset-avatar-save').onclick = async () => {
+    const fileInput = document.getElementById('pset-avatar-file');
+    const err = document.getElementById('pset-avatar-err');
     const file = fileInput.files[0];
     if(!file){ err.textContent = 'Kies eerst een foto.'; return; }
     if(file.size > 8*1024*1024){ err.textContent = 'Bestand is te groot (max 8MB).'; return; }
-    const okBtn = document.getElementById('avatar-ok');
-    okBtn.disabled = true; okBtn.textContent = 'Bezig…';
+    const btn = document.getElementById('pset-avatar-save');
+    btn.disabled = true; btn.textContent = 'Bezig…';
     try{
       await uploadAvatar(file, user.id);
       closeModal();
@@ -1029,8 +1061,26 @@ function avatarModal(user){
     }catch(e){
       console.error(e);
       err.textContent = 'Upload mislukt. Probeer opnieuw.';
-      okBtn.disabled = false; okBtn.textContent = 'Uploaden';
+      btn.disabled = false; btn.textContent = 'Foto uploaden';
     }
+  };
+
+  document.getElementById('pset-pin-save').onclick = async () => {
+    const oldPin = document.getElementById('pset-pin-old').value.trim();
+    const newPin = document.getElementById('pset-pin-new').value.trim();
+    const err = document.getElementById('pset-pin-err');
+    if(newPin.length < 4){ err.textContent = 'Nieuwe code moet minstens 4 tekens zijn.'; return; }
+    const btn = document.getElementById('pset-pin-save');
+    btn.disabled = true;
+    const oldHash = await hashPin(oldPin);
+    const newHash = await hashPin(newPin);
+    const { data, error } = await sb.rpc('fn_change_pin', { p_user_id: user.id, p_old_pin_hash: oldHash, p_new_pin_hash: newHash });
+    btn.disabled = false;
+    if(error || !data){ err.textContent = friendlyError(error); return; }
+    err.textContent = '';
+    document.getElementById('pset-pin-old').value = '';
+    document.getElementById('pset-pin-new').value = '';
+    showToast('Code gewijzigd.');
   };
 }
 
@@ -1174,7 +1224,10 @@ function bossView(allLog, allCustLog){
           <td class="num">${fmtNum(s.ingelegd)}</td>
           <td class="num">${fmtNum(s.opgehaald)}</td>
           <td class="num">${fmtNum(s.geleverd)}</td>
-          <td style="text-align:right;">${s.id ? `<button class="btn danger small" data-del-profile="${s.id}" data-del-name="${escapeHtml(s.name)}">${ICONS.trash}Verwijderen</button>` : ''}</td>
+          <td style="text-align:right;white-space:nowrap;">${s.id ? `
+            <button class="btn secondary small" data-reset-pin="${s.id}" data-reset-name="${escapeHtml(s.name)}" style="margin-right:6px;">${ICONS.lock}Code resetten</button>
+            <button class="btn danger small" data-del-profile="${s.id}" data-del-name="${escapeHtml(s.name)}">${ICONS.trash}Verwijderen</button>
+          ` : ''}</td>
         </tr>`).join('')}</tbody>
       </table>
     </div>
@@ -1201,6 +1254,14 @@ async function deleteProfileFromBoss(userId, userName){
   render();
 }
 
+async function resetPinFromBoss(userId, userName){
+  if(!confirm(`Code van "${userName}" resetten? Het profiel (met alle geschiedenis) blijft bestaan, maar ${userName} moet opnieuw claimen met een nieuwe zelfgekozen code.`)) return;
+  const { error } = await sb.rpc('fn_boss_reset_pin', { p_user_id: userId, p_boss_pin_hash: bossPinHash() });
+  if(error){ showToast(friendlyError(error), 'error'); return; }
+  showToast(`Code van "${userName}" gereset — kan opnieuw geclaimd worden.`);
+  render();
+}
+
 function attachBossHandlers(){
   attachCommonHandlers();
   const lockBtn = document.querySelector('[data-boss-lock]');
@@ -1212,6 +1273,11 @@ function attachBossHandlers(){
   document.querySelectorAll('[data-del-profile]').forEach(el=>{
     el.addEventListener('click', () => {
       deleteProfileFromBoss(el.getAttribute('data-del-profile'), el.getAttribute('data-del-name'));
+    });
+  });
+  document.querySelectorAll('[data-reset-pin]').forEach(el=>{
+    el.addEventListener('click', () => {
+      resetPinFromBoss(el.getAttribute('data-reset-pin'), el.getAttribute('data-reset-name'));
     });
   });
   const filter = document.getElementById('boss-filter');
@@ -1254,7 +1320,7 @@ function attachCommonHandlers(){
   document.querySelectorAll('[data-edit-avatar]').forEach(el=>{
     el.addEventListener('click', () => {
       const me = getUser(session);
-      if(me) avatarModal(me);
+      if(me) profileSettingsModal(me);
     });
   });
   document.querySelectorAll('[data-logout]').forEach(el=>{
