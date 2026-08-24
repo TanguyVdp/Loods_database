@@ -340,8 +340,11 @@ const KLANT_RATIO_IN = 4, KLANT_RATIO_OUT = 1; // klanten: 4 geleverd -> 1 zakje
 const MAX_USERS = 25;
 const SESSION_KEY = "loods25-session";
 const BOSS_KEY = "wietloods-boss-session";
-const BATCH_SIZE = 3;    // TEST: zakjes per verwerkingsbatch
-const BATCH_MINUTES = 3; // TEST: minuten per batch — een batch is ondeelbaar (alles of niets bij een restart)
+// TEST: zakjes-per-batch en minuten-per-batch zijn niet langer vast — instelbaar
+// via het kalibratiepunt (bv. als de loods geüpgraded wordt en sneller verwerkt).
+// Standaardwaarden voor als er nog geen kalibratiepunt is ingesteld:
+const DEFAULT_BATCH_SIZE = 3;
+const DEFAULT_BATCH_MINUTES = 3;
 
 let cache = { users: [], log: [], customers: [] }; // laatst opgehaalde data, voor previews
 let session = localStorage.getItem(SESSION_KEY) || null; // ingelogde user id
@@ -398,35 +401,37 @@ function findEarliestBlackoutOverlap(start, end){
 }
 // een batch is ondeelbaar: raakt hij een restart-venster (ook maar gedeeltelijk),
 // dan telt die voortgang niet mee en herbegint de VOLLEDIGE batch na de restart
-function scheduleBatch(startDate){
+function scheduleBatch(startDate, batchMinutes){
   let start = new Date(startDate);
   while(true){
-    const end = new Date(start.getTime() + BATCH_MINUTES * 60000);
+    const end = new Date(start.getTime() + batchMinutes * 60000);
     const overlap = findEarliestBlackoutOverlap(start, end);
     if(!overlap) return { start, end };
     start = new Date(overlap.end);
   }
 }
 
-function computeQueueTimeline(log, sinceTs){
+function computeQueueTimeline(log, sinceTs, batchSize, batchMinutes){
+  batchSize = batchSize || DEFAULT_BATCH_SIZE;
+  batchMinutes = batchMinutes || DEFAULT_BATCH_MINUTES;
   const cutoff = sinceTs ? new Date(sinceTs) : null;
   const deposits = log.filter(e => e.type === 'inleg' && e.zakjes_delta > 0 && (!cutoff || new Date(e.ts) > cutoff))
     .slice().sort((a,b) => new Date(a.ts) - new Date(b.ts));
 
-  // ontvouw elke inleg in losse zakjes (FIFO), en groepeer die per BATCH_SIZE
+  // ontvouw elke inleg in losse zakjes (FIFO), en groepeer die per batchSize
   const units = [];
   deposits.forEach((e, di) => {
     for(let i = 0; i < e.zakjes_delta; i++) units.push({ depositIndex: di, depositTs: new Date(e.ts) });
   });
   const batches = [];
-  for(let i = 0; i < units.length; i += BATCH_SIZE) batches.push(units.slice(i, i + BATCH_SIZE));
+  for(let i = 0; i < units.length; i += batchSize) batches.push(units.slice(i, i + batchSize));
 
   let freeAt = null;
   const perDeposit = new Map();
   batches.forEach(batch => {
     const eligible = new Date(Math.max(...batch.map(u => u.depositTs.getTime())));
     const from = (freeAt && freeAt > eligible) ? freeAt : eligible;
-    const { start, end } = scheduleBatch(from);
+    const { start, end } = scheduleBatch(from, batchMinutes);
     freeAt = end;
     batch.forEach(u => {
       if(!perDeposit.has(u.depositIndex)){
@@ -446,9 +451,10 @@ let lastBaseline = { value: 0, set_at: new Date(0).toISOString(), set_by: null }
 let queueTickInterval = null;
 
 async function fetchLoodsBaseline(){
+  const fallback = { value: 0, batch_size: DEFAULT_BATCH_SIZE, batch_minutes: DEFAULT_BATCH_MINUTES, set_at: new Date(0).toISOString(), set_by: null };
   const { data, error } = await sb.from('loods_baseline').select('*').eq('id', true).maybeSingle();
-  if(error || !data) return { value: 0, set_at: new Date(0).toISOString(), set_by: null };
-  return data;
+  if(error || !data) return fallback;
+  return { ...fallback, ...data };
 }
 
 // planten die volgens het kalibratiepunt + de wachtrij nu nog fysiek in de loods liggen
@@ -466,17 +472,24 @@ function updateLoodsStatTile(){
 function queueWidgetHtml(timeline, baseline){
   const now = new Date();
   const active = timeline.filter(t => t.end > now);
+  const hint = `Eerlijk op volgorde van inleg (FIFO) — batches van ${baseline.batch_size} zakjes per ${baseline.batch_minutes} min. Een batch die een server-restart raakt (7u55-8u10, 11u55-12u10, 17u55-18u10) herbegint volledig na de restart.`;
   const calibrateRow = `
-    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-      <span style="font-size:11px;color:var(--muted);">Kalibratiepunt: <b class="mono" style="color:var(--cream)">${fmtNum(baseline.value)}</b>${baseline.set_by ? ` · gezet door ${escapeHtml(baseline.set_by)} om ${fmtClock(new Date(baseline.set_at))}` : ' · nog niet ingesteld'}</span>
-      <input type="number" id="baseline-input" min="0" placeholder="werkelijke voorraad nu" style="max-width:170px;background:rgba(255,255,255,0.035);border:1px solid var(--border);border-radius:7px;color:var(--cream);padding:6px 9px;font-family:'Space Mono',monospace;font-size:13px;">
-      <button class="btn secondary small" id="baseline-save">Kalibreren</button>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+      <span style="font-size:11px;color:var(--muted);">Kalibratiepunt: <b class="mono" style="color:var(--cream)">${fmtNum(baseline.value)}</b> planten, snelheid <b class="mono" style="color:var(--cream)">${baseline.batch_size}/${baseline.batch_minutes}min</b>${baseline.set_by ? ` · gezet door ${escapeHtml(baseline.set_by)} om ${fmtClock(new Date(baseline.set_at))}` : ' · nog niet ingesteld'}</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;">
+        <input type="number" id="baseline-input" min="0" placeholder="werkelijke voorraad nu" style="max-width:170px;background:rgba(255,255,255,0.035);border:1px solid var(--border);border-radius:7px;color:var(--cream);padding:6px 9px;font-family:'Space Mono',monospace;font-size:13px;">
+        <input type="number" id="batch-size-input" min="1" value="${baseline.batch_size}" title="zakjes per batch" style="max-width:80px;background:rgba(255,255,255,0.035);border:1px solid var(--border);border-radius:7px;color:var(--cream);padding:6px 9px;font-family:'Space Mono',monospace;font-size:13px;">
+        <span style="font-size:11px;color:var(--muted);">zakjes /</span>
+        <input type="number" id="batch-minutes-input" min="1" value="${baseline.batch_minutes}" title="minuten per batch" style="max-width:80px;background:rgba(255,255,255,0.035);border:1px solid var(--border);border-radius:7px;color:var(--cream);padding:6px 9px;font-family:'Space Mono',monospace;font-size:13px;">
+        <span style="font-size:11px;color:var(--muted);">min</span>
+        <button class="btn secondary small" id="baseline-save">Kalibreren</button>
+      </div>
     </div>`;
 
   if(active.length === 0){
     return `<div class="card" id="queue-widget" style="margin-bottom:20px;">
       <h2>${ICONS.clock}Verwerkingswachtrij <span class="pill" style="margin-left:6px;">TEST</span></h2>
-      <p class="hint">Eerlijk op volgorde van inleg (FIFO) — batches van ${BATCH_SIZE} zakjes per ${BATCH_MINUTES} min. Een batch die een server-restart raakt (7u55-8u10, 11u55-12u10, 17u55-18u10) herbegint volledig na de restart.</p>
+      <p class="hint">${hint}</p>
       <div class="empty">Wachtrij is momenteel leeg.</div>
       ${calibrateRow}
     </div>`;
@@ -499,7 +512,7 @@ function queueWidgetHtml(timeline, baseline){
 
   return `<div class="card" id="queue-widget" style="margin-bottom:20px;">
     <h2>${ICONS.clock}Verwerkingswachtrij <span class="pill" style="margin-left:6px;">TEST</span></h2>
-    <p class="hint">Eerlijk op volgorde van inleg (FIFO) — batches van ${BATCH_SIZE} zakjes per ${BATCH_MINUTES} min. Een batch die een server-restart raakt (7u55-8u10, 11u55-12u10, 17u55-18u10) herbegint volledig na de restart.</p>
+    <p class="hint">${hint}</p>
     <div class="log">${rows}</div>
     ${calibrateRow}
   </div>`;
@@ -507,13 +520,15 @@ function queueWidgetHtml(timeline, baseline){
 function attachQueueWidgetHandlers(){
   const baselineBtn = document.getElementById('baseline-save');
   if(baselineBtn) baselineBtn.addEventListener('click', async () => {
-    const input = document.getElementById('baseline-input');
-    const val = parseInt(input.value, 10);
-    if(isNaN(val) || val < 0){ showToast('Voer een geldig aantal in.', 'error'); return; }
+    const val = parseInt(document.getElementById('baseline-input').value, 10);
+    const bs = parseInt(document.getElementById('batch-size-input').value, 10);
+    const bm = parseInt(document.getElementById('batch-minutes-input').value, 10);
+    if(isNaN(val) || val < 0){ showToast('Voer een geldig voorraadaantal in.', 'error'); return; }
+    if(isNaN(bs) || bs <= 0 || isNaN(bm) || bm <= 0){ showToast('Voer een geldige snelheid in.', 'error'); return; }
     const me = getUser(session);
-    const { error } = await sb.rpc('fn_set_loods_baseline', { p_value: val, p_set_by: me ? me.name : '?' });
+    const { error } = await sb.rpc('fn_set_loods_baseline', { p_value: val, p_batch_size: bs, p_batch_minutes: bm, p_set_by: me ? me.name : '?' });
     if(error){ showToast(friendlyError(error), 'error'); return; }
-    showToast('Voorraad gekalibreerd.');
+    showToast('Voorraad + snelheid gekalibreerd.');
     render();
   });
 }
@@ -936,7 +951,7 @@ function dashboardView(allInlegLog, baseline){
   const myZakjes = zakjesVoor(me.total_ingelegd);
   const myTegoed = myZakjes - me.opgehaald;
 
-  const queueTimeline = computeQueueTimeline(allInlegLog, baseline.set_at);
+  const queueTimeline = computeQueueTimeline(allInlegLog, baseline.set_at, baseline.batch_size, baseline.batch_minutes);
   lastQueueTimeline = queueTimeline;
   lastBaseline = baseline;
 
