@@ -441,11 +441,23 @@ function computeQueueTimeline(log){
   });
 }
 
-let lastQueueLog = [];
+let lastQueueTimeline = [];
+let lastTotalIngelegd = 0;
 let queueTickInterval = null;
-function queueWidgetHtml(allLog){
-  lastQueueLog = allLog;
-  const timeline = computeQueueTimeline(allLog);
+
+// hoeveel planten zijn er (volgens de wachtrij) al effectief verwerkt en dus
+// niet meer fysiek in de loods, ongeacht wie ze inlegde
+function plantenNogInLoods(timeline, totalIngelegd){
+  const now = new Date();
+  const verwerkteZakjes = timeline.filter(t => t.end <= now).reduce((s,t) => s + t.zakjes, 0);
+  return Math.max(0, totalIngelegd - verwerkteZakjes * RATIO_IN);
+}
+function updateLoodsStatTile(){
+  const el = document.getElementById('stat-planten-loods');
+  if(el) el.textContent = fmtNum(plantenNogInLoods(lastQueueTimeline, lastTotalIngelegd));
+}
+
+function queueWidgetHtml(timeline){
   const now = new Date();
   const active = timeline.filter(t => t.end > now);
 
@@ -483,7 +495,8 @@ function startQueueTicker(){
   queueTickInterval = setInterval(() => {
     const el = document.getElementById('queue-widget');
     if(!el){ clearInterval(queueTickInterval); return; }
-    el.outerHTML = queueWidgetHtml(lastQueueLog);
+    el.outerHTML = queueWidgetHtml(lastQueueTimeline);
+    updateLoodsStatTile();
   }, 20000);
 }
 
@@ -894,6 +907,10 @@ function dashboardView(allInlegLog){
   const myZakjes = zakjesVoor(me.total_ingelegd);
   const myTegoed = myZakjes - me.opgehaald;
 
+  const queueTimeline = computeQueueTimeline(allInlegLog);
+  lastQueueTimeline = queueTimeline;
+  lastTotalIngelegd = totalIngelegd;
+
   const rows = [...cache.users].sort((a,b)=> (zakjesVoor(b.total_ingelegd)-b.opgehaald) - (zakjesVoor(a.total_ingelegd)-a.opgehaald))
     .map(u => {
       const z = zakjesVoor(u.total_ingelegd);
@@ -936,7 +953,7 @@ function dashboardView(allInlegLog){
     </div>
 
     <div class="totals" style="margin-bottom:22px;">
-      <div class="t"><div class="n">${fmtNum(totalIngelegd)}</div><div class="l">planten in loods</div></div>
+      <div class="t"><div class="n" id="stat-planten-loods">${fmtNum(plantenNogInLoods(queueTimeline, totalIngelegd))}</div><div class="l">planten in loods</div></div>
       <div class="t"><div class="n">${fmtNum(totalZakjesToegekend)}</div><div class="l">zakjes toegekend</div></div>
       <div class="t"><div class="n">${fmtNum(totalOpgehaald)}</div><div class="l">al opgehaald</div></div>
       <div class="t"><div class="n tegoed">${fmtNum(totalZakjesToegekend - totalOpgehaald)}</div><div class="l">nog tegoed</div></div>
@@ -947,7 +964,7 @@ function dashboardView(allInlegLog){
       <div class="progress-label"><b>${totalOpgehaald}</b> van <b>${totalZakjesToegekend}</b> toegekende zakjes al opgehaald (${totalZakjesToegekend>0 ? Math.round(totalOpgehaald/totalZakjesToegekend*100) : 0}%)</div>
     </div>
 
-    ${queueWidgetHtml(allInlegLog)}
+    ${queueWidgetHtml(queueTimeline)}
 
     <div class="grid2">
       <div class="card">
