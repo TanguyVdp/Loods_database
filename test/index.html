@@ -375,15 +375,67 @@ function fmtDate(d){ return d.toLocaleDateString('nl-BE',{day:'2-digit',month:'2
 
 // ---------- TEST: verwerkingswachtrij (FIFO, eerst ingelegd = eerst verwerkt) ----------
 // Puur berekend uit bestaande 'inleg'-registraties (tijdstip + zakjes), schrijft niets weg.
+
+// Server-restarts: tijdens deze dagelijkse vensters wordt er niet verwerkt/geteld.
+const RESTART_WINDOWS = [
+  { h: 7, m: 55, endH: 8, endM: 10 },
+  { h: 11, m: 55, endH: 12, endM: 10 },
+  { h: 17, m: 55, endH: 18, endM: 10 }
+];
+function getBlackoutWindowFor(date){
+  for(const w of RESTART_WINDOWS){
+    const start = new Date(date); start.setHours(w.h, w.m, 0, 0);
+    const end = new Date(date); end.setHours(w.endH, w.endM, 0, 0);
+    if(date >= start && date < end) return { start, end };
+  }
+  return null;
+}
+function getNextBlackoutStart(date){
+  let best = null;
+  for(let dayOffset = 0; dayOffset <= 1; dayOffset++){
+    for(const w of RESTART_WINDOWS){
+      const start = new Date(date);
+      start.setDate(start.getDate() + dayOffset);
+      start.setHours(w.h, w.m, 0, 0);
+      if(start > date && (!best || start < best)) best = start;
+    }
+  }
+  return best;
+}
+function skipBlackout(date){
+  const win = getBlackoutWindowFor(date);
+  return win ? new Date(win.end) : date;
+}
+// telt `minutes` minuten verwerkingstijd op bij `startDate`, maar slaat elk
+// restart-venster dat onderweg ligt gewoon over (telt niet mee)
+function addMinutesSkippingBlackout(startDate, minutes){
+  let current = skipBlackout(new Date(startDate));
+  let remainingMs = minutes * 60000;
+  while(remainingMs > 0){
+    const win = getBlackoutWindowFor(current);
+    if(win){ current = new Date(win.end); continue; }
+    const nextStart = getNextBlackoutStart(current);
+    const availableMs = nextStart ? (nextStart - current) : Infinity;
+    if(remainingMs <= availableMs){
+      current = new Date(current.getTime() + remainingMs);
+      remainingMs = 0;
+    } else {
+      current = new Date(current.getTime() + availableMs);
+      remainingMs -= availableMs;
+    }
+  }
+  return current;
+}
+
 function computeQueueTimeline(log){
   const entries = log.filter(e => e.type === 'inleg' && e.zakjes_delta > 0)
     .slice().sort((a,b) => new Date(a.ts) - new Date(b.ts));
   let freeAt = null;
   return entries.map(e => {
     const deposit = new Date(e.ts);
-    const start = (freeAt && freeAt > deposit) ? freeAt : deposit;
+    const start = skipBlackout((freeAt && freeAt > deposit) ? freeAt : deposit);
     const minutes = e.zakjes_delta * PROCESSING_MINUTES_PER_ZAKJE;
-    const end = new Date(start.getTime() + minutes * 60000);
+    const end = addMinutesSkippingBlackout(start, minutes);
     freeAt = end;
     return { userName: e.user_name, zakjes: e.zakjes_delta, start, end, minutes };
   });
@@ -400,7 +452,7 @@ function queueWidgetHtml(allLog){
   if(active.length === 0){
     return `<div class="card" id="queue-widget" style="margin-bottom:20px;">
       <h2>${ICONS.clock}Verwerkingswachtrij <span class="pill" style="margin-left:6px;">TEST</span></h2>
-      <p class="hint">Eerlijk op volgorde van inleg (FIFO) — ${PROCESSING_MINUTES_PER_ZAKJE} min per zakje.</p>
+      <p class="hint">Eerlijk op volgorde van inleg (FIFO) — ${PROCESSING_MINUTES_PER_ZAKJE} min per zakje. Er wordt niet geteld tijdens server-restarts (7u55-8u10, 11u55-12u10, 17u55-18u10).</p>
       <div class="empty">Wachtrij is momenteel leeg.</div>
     </div>`;
   }
@@ -422,7 +474,7 @@ function queueWidgetHtml(allLog){
 
   return `<div class="card" id="queue-widget" style="margin-bottom:20px;">
     <h2>${ICONS.clock}Verwerkingswachtrij <span class="pill" style="margin-left:6px;">TEST</span></h2>
-    <p class="hint">Eerlijk op volgorde van inleg (FIFO) — ${PROCESSING_MINUTES_PER_ZAKJE} min per zakje.</p>
+    <p class="hint">Eerlijk op volgorde van inleg (FIFO) — ${PROCESSING_MINUTES_PER_ZAKJE} min per zakje. Er wordt niet geteld tijdens server-restarts (7u55-8u10, 11u55-12u10, 17u55-18u10).</p>
     <div class="log">${rows}</div>
   </div>`;
 }
