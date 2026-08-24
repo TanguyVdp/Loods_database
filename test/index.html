@@ -340,7 +340,7 @@ const KLANT_RATIO_IN = 4, KLANT_RATIO_OUT = 1; // klanten: 4 geleverd -> 1 zakje
 const MAX_USERS = 25;
 const SESSION_KEY = "loods25-session";
 const BOSS_KEY = "wietloods-boss-session";
-const PROCESSING_MINUTES_PER_ZAKJE = 3; // TEST: hoeveel minuten het verwerken van 1 zakje kost
+const PROCESSING_MINUTES_PER_ZAKJE = 1; // TEST: 3 min per 3 zakjes = 1 min per zakje
 
 let cache = { users: [], log: [], customers: [] }; // laatst opgehaalde data, voor previews
 let session = localStorage.getItem(SESSION_KEY) || null; // ingelogde user id
