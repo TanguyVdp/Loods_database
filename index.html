@@ -199,6 +199,9 @@ tr.me td{background:rgba(166,242,77,0.04);}
 tr.clickable{cursor:pointer;touch-action:manipulation;transition:background .1s;}
 tr.clickable:hover td{background:rgba(255,255,255,0.025);}
 .tegoed{color:var(--lime);font-weight:700;}
+.drag-handle{cursor:grab;touch-action:none;color:var(--muted-dim);display:inline-flex;align-items:center;padding:4px;margin-right:2px;}
+.drag-handle:hover{color:var(--muted);}
+tr.dragging{opacity:0.45;background:var(--surface-hi);}
 .pill{display:inline-block;background:rgba(149,132,240,0.1);border:1px solid rgba(149,132,240,0.28);color:var(--violet);
   font-size:9.5px;padding:2.5px 8px;border-radius:20px;letter-spacing:0.02em;font-weight:600;}
 
@@ -389,8 +392,48 @@ const ICONS = {
   truck: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="7" width="13" height="10"/><path d="M14 10h4l4 4v3h-8"/><circle cx="5.5" cy="19" r="1.7"/><circle cx="17.5" cy="19" r="1.7"/></svg>`,
   list: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="3.5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="3.5" cy="18" r="1.4" fill="currentColor" stroke="none"/></svg>`,
   gear: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
-  menu: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>`
+  menu: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>`,
+  grip: `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="6" r="1.6"/><circle cx="8" cy="12" r="1.6"/><circle cx="8" cy="18" r="1.6"/><circle cx="16" cy="6" r="1.6"/><circle cx="16" cy="12" r="1.6"/><circle cx="16" cy="18" r="1.6"/></svg>`
 };
+// ---------- rijen verslepen om volgorde aan te passen (muis + touch) ----------
+let rowDragState = null;
+function attachRowDrag(tbody, onReorder){
+  if(!tbody) return;
+  tbody.querySelectorAll('[data-drag-handle]').forEach(handle => {
+    handle.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const row = handle.closest('tr');
+      if(!row) return;
+      rowDragState = { tbody, row, onReorder };
+      row.classList.add('dragging');
+      document.addEventListener('pointermove', onRowDragMove);
+      document.addEventListener('pointerup', onRowDragEnd);
+    });
+  });
+}
+function onRowDragMove(e){
+  if(!rowDragState) return;
+  const { tbody, row } = rowDragState;
+  const rows = [...tbody.querySelectorAll('tr')];
+  const afterRow = rows.find(r => {
+    if(r === row) return false;
+    const rect = r.getBoundingClientRect();
+    return e.clientY < rect.top + rect.height / 2;
+  });
+  if(afterRow) tbody.insertBefore(row, afterRow);
+  else tbody.appendChild(row);
+}
+async function onRowDragEnd(){
+  document.removeEventListener('pointermove', onRowDragMove);
+  document.removeEventListener('pointerup', onRowDragEnd);
+  if(!rowDragState) return;
+  const { tbody, row, onReorder } = rowDragState;
+  row.classList.remove('dragging');
+  rowDragState = null;
+  const ids = [...tbody.querySelectorAll('tr')].map(r => r.getAttribute('data-drag-id')).filter(Boolean);
+  await onReorder(ids);
+}
+
 function openMobileMenu(){
   document.getElementById('sidebar')?.classList.add('open');
   document.getElementById('sidebar-overlay')?.classList.add('open');
@@ -517,7 +560,7 @@ function goTo(hash){ window.location.hash = hash; }
 
 // ---------- data laden ----------
 async function fetchUsers(){
-  const { data, error } = await sb.from('users_public').select('*').order('name');
+  const { data, error } = await sb.from('users_public').select('*').order('sort_order', {ascending:true, nullsFirst:false}).order('name');
   if(error){ console.error(error); return []; }
   return data;
 }
@@ -1199,7 +1242,9 @@ function bossLogEntriesHtml(list){
 }
 
 function bossView(allLog, allCustLog){
-  const persons = [...cache.users].map(u => u.name).sort((a,b)=>a.localeCompare(b));
+  // volgorde = cache.users' huidige sortering (sort_order), niet alfabetisch —
+  // zo blijft de sleep-volgorde uit "Overzicht per persoon" behouden.
+  const persons = cache.users.map(u => u.name);
 
   bossMerged = [
     ...allLog.map(e => ({
@@ -1238,11 +1283,12 @@ function bossView(allLog, allCustLog){
       <button class="btn secondary" data-boss-lock="1">${ICONS.lock}Vergrendelen</button>
     </div>
 
-    <div class="section-title"><h2>${ICONS.users}Overzicht per persoon</h2><span>${persons.length} leden</span></div>
+    <div class="section-title"><h2>${ICONS.users}Overzicht per persoon</h2><span>${persons.length} leden — sleep om volgorde aan te passen</span></div>
     <div class="card" style="padding:14px 20px;">
       <table>
-        <thead><tr><th>Naam</th><th class="num">Ingelegd</th><th class="num">Opgehaald</th><th class="num">Geleverd aan klanten</th><th></th></tr></thead>
-        <tbody>${summary.map(s => `<tr>
+        <thead><tr><th></th><th>Naam</th><th class="num">Ingelegd</th><th class="num">Opgehaald</th><th class="num">Geleverd aan klanten</th><th></th></tr></thead>
+        <tbody id="boss-summary-tbody">${summary.map(s => `<tr data-drag-id="${s.id || ''}">
+          <td style="width:1%;">${s.id ? `<span class="drag-handle" data-drag-handle="1" title="Sleep om te herschikken">${ICONS.grip}</span>` : ''}</td>
           <td>${personDot(s.name)}${escapeHtml(s.name)}</td>
           <td class="num">${fmtNum(s.ingelegd)}</td>
           <td class="num">${fmtNum(s.opgehaald)}</td>
@@ -1285,6 +1331,12 @@ async function resetPinFromBoss(userId, userName){
   render();
 }
 
+async function saveBossOrder(ids){
+  const { error } = await sb.rpc('fn_boss_set_order', { p_order: ids, p_boss_pin_hash: bossPinHash() });
+  if(error){ showToast(friendlyError(error), 'error'); render(); return; }
+  showToast('Volgorde opgeslagen.');
+}
+
 function attachBossHandlers(){
   attachCommonHandlers();
   const lockBtn = document.querySelector('[data-boss-lock]');
@@ -1303,6 +1355,7 @@ function attachBossHandlers(){
       resetPinFromBoss(el.getAttribute('data-reset-pin'), el.getAttribute('data-reset-name'));
     });
   });
+  attachRowDrag(document.getElementById('boss-summary-tbody'), saveBossOrder);
   const filter = document.getElementById('boss-filter');
   if(filter){
     filter.addEventListener('change', () => {
