@@ -1,0 +1,1587 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<title>Varrios Wietloods — Voorraadmanifest</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" type="image/png" href="logo.png">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap');
+
+:root{
+  color-scheme: dark;
+  --bg:#07090B;
+  --bg-soft:#0B0F0D;
+  --surface:rgba(255,255,255,0.025);
+  --surface-hi:rgba(255,255,255,0.045);
+  --glass:rgba(255,255,255,0.025);
+  --glass-hi:rgba(255,255,255,0.045);
+  --border:rgba(255,255,255,0.075);
+  --border-hi:rgba(255,255,255,0.14);
+  --lime:#A6F24D;
+  --cyan:#3FDDC4;
+  --violet:#9584F0;
+  --pink:#EC7FC0;
+  --cream:#EEF2EF;
+  --muted:#828E89;
+  --muted-dim:#5B6560;
+  --warn:#F0B24E;
+  --danger:#F0645F;
+  --grad-a: var(--lime);
+  --grad-b: var(--violet);
+  --ease: cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--cream);font-family:'Inter',sans-serif;}
+body{
+  min-height:100vh;position:relative;overflow-x:hidden;
+  font-size:14px;line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+  background:var(--bg);
+}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.01) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.01) 1px, transparent 1px);
+  background-size:48px 48px;
+  mask-image:radial-gradient(ellipse 70% 50% at 50% 0%, black, transparent 70%);
+}
+h1,.display{font-family:'Space Grotesk',sans-serif;letter-spacing:-0.015em;}
+h2,h3{font-family:'Inter',sans-serif;letter-spacing:-0.005em;margin:0;}
+.mono{font-family:'Space Mono',monospace;font-variant-numeric:tabular-nums;}
+
+@keyframes fadeUp{ from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:translateY(0);} }
+.wrap > *{animation:fadeUp .4s var(--ease) both;}
+.wrap > *:nth-child(2){animation-delay:.025s;}
+.wrap > *:nth-child(3){animation-delay:.05s;}
+.wrap > *:nth-child(4){animation-delay:.075s;}
+.wrap > *:nth-child(5){animation-delay:.1s;}
+.wrap > *:nth-child(6){animation-delay:.125s;}
+.wrap > *:nth-child(7){animation-delay:.15s;}
+
+/* ---------- layout shell ---------- */
+.wrap{max-width:1040px;margin:0 auto;padding:0 24px 64px;position:relative;z-index:1;}
+header.top{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  padding:18px 0;margin-bottom:28px;border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:40;background:var(--bg);
+  margin-left:-24px;margin-right:-24px;padding-left:24px;padding-right:24px;
+}
+.brand{display:flex;align-items:center;gap:13px;}
+
+.dial{width:32px;height:32px;border-radius:7px;flex-shrink:0;background:var(--lime);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.dial.klant{background:var(--violet);}
+.dial-inner{display:contents;}
+.dial-inner .r{font-family:'Space Mono',monospace;font-weight:700;font-size:10px;color:#08130A;line-height:1;}
+.dial-inner .l{display:none;}
+.brand-logo{width:34px;height:34px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#000;}
+
+.brand h1{font-size:16.5px;margin:0;line-height:1.1;font-weight:700;color:var(--cream);letter-spacing:-0.01em;}
+.brand p{margin:1px 0 0;color:var(--muted);font-size:11px;letter-spacing:0.01em;}
+
+.totals{display:flex;gap:0;flex-wrap:wrap;}
+.totals .t{text-align:right;padding:0 20px;border-left:1px solid var(--border);}
+.totals .t:first-child{border-left:none;padding-left:0;}
+.totals .t .n{font-family:'Space Mono',monospace;font-size:19px;font-weight:700;color:var(--cream);letter-spacing:-0.02em;font-variant-numeric:tabular-nums;}
+.totals .t .n.tegoed{color:var(--lime);}
+.totals .t .l{font-size:9.5px;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-top:3px;font-weight:600;}
+
+/* ---------- nav tabs ---------- */
+.navtabs{display:inline-flex;gap:2px;margin-bottom:24px;padding:3px;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;}
+.navtab{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:transparent;border:none;color:var(--muted);
+  font-family:'Inter',sans-serif;font-weight:600;font-size:12.5px;border-radius:5px;
+  cursor:pointer;transition:color .15s ease, background .15s ease;}
+.navtab svg{flex-shrink:0;}
+.navtab:hover{color:var(--cream);}
+.navtab.active{background:var(--surface-hi);color:var(--cream);}
+.navtab.active svg{color:var(--lime);}
+
+/* ---------- login / profiles ---------- */
+.login-shell{max-width:640px;margin:44px auto 0;text-align:center;}
+.login-shell h2{font-size:17px;margin-bottom:6px;font-weight:600;letter-spacing:-0.01em;}
+.login-shell .sub{color:var(--muted);font-size:12.5px;margin-bottom:32px;line-height:1.6;}
+.avatar-grid{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;}
+.avatar-tile{
+  width:112px;padding:18px 10px 15px;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;cursor:pointer;touch-action:manipulation;
+  display:flex;flex-direction:column;align-items:center;gap:9px;
+  transition:border-color .15s, background .15s;
+}
+.avatar-tile:hover{border-color:var(--border-hi);background:var(--surface-hi);}
+.avatar-circle{width:36px;height:36px;border-radius:7px;background:transparent;
+  display:flex;align-items:center;justify-content:center;font-family:'Inter',sans-serif;
+  font-weight:700;font-size:13px;color:#08130A;}
+.avatar-photo{border-radius:7px;background-size:cover;background-position:center;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-family:'Inter',sans-serif;font-weight:700;color:#08130A;}
+.who-avatar-btn{background:none;border:none;padding:0;margin-right:9px;cursor:pointer;line-height:0;border-radius:6px;
+  transition:box-shadow .15s;}
+.who-avatar-btn:hover{box-shadow:0 0 0 2px var(--border-hi);}
+.avatar-tile .nm{font-family:'Inter',sans-serif;font-size:13px;font-weight:600;text-transform:capitalize;color:var(--cream);}
+.avatar-tile .st{display:flex;align-items:center;gap:5px;font-size:9.5px;color:var(--muted);letter-spacing:0.02em;}
+.avatar-tile .st .dot{width:5px;height:5px;border-radius:50%;background:var(--lime);}
+.avatar-tile.unclaimed .st .dot{background:var(--warn);}
+.avatar-tile.add{border-style:dashed;border-color:var(--border-hi);background:transparent;}
+.avatar-tile.add .avatar-circle{background:transparent;border:1.5px dashed var(--muted-dim);color:var(--muted);}
+.avatar-tile.add .nm{color:var(--muted);}
+
+.modal-bg{position:fixed;inset:0;background:rgba(4,5,6,0.82);
+  display:flex;justify-content:center;z-index:50;padding:16px;
+  padding-top:max(16px, env(safe-area-inset-top));
+  padding-bottom:max(16px, env(safe-area-inset-bottom));
+  overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.modal{background:#0C0F0D;border:1px solid var(--border-hi);border-radius:10px;padding:24px;
+  width:100%;max-width:330px;margin:auto;flex-shrink:0;box-shadow:0 20px 50px rgba(0,0,0,0.5);}
+.modal h3{margin:0 0 4px;font-size:16.5px;font-weight:600;letter-spacing:-0.01em;}
+.modal p.hint{color:var(--muted);font-size:12px;margin:0 0 16px;line-height:1.55;}
+.modal label{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;margin-top:14px;font-weight:600;}
+.modal input{width:100%;background:rgba(255,255,255,0.035);border:1px solid var(--border);border-radius:7px;color:var(--cream);
+  padding:12px;font-family:'Space Mono',monospace;font-size:16px;letter-spacing:0.03em;transition:border-color .15s, box-shadow .15s;}
+.modal input:focus{outline:none;border-color:var(--lime);box-shadow:0 0 0 3px rgba(166,242,77,0.1);}
+.modal .row-btns{display:flex;gap:8px;margin-top:22px;}
+.err{color:var(--danger);font-size:11.5px;margin-top:8px;min-height:14px;}
+
+button{cursor:pointer;font-family:'Inter',sans-serif;touch-action:manipulation;}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  background:var(--grad-a);border:1px solid transparent;color:#08130A;font-weight:600;padding:10px 16px;font-size:13px;
+  border-radius:7px;letter-spacing:0.005em;transition:filter .12s, background .12s, border-color .12s;min-height:38px;}
+.btn svg{flex-shrink:0;}
+.btn:hover{filter:brightness(1.08);}
+.btn:active{filter:brightness(0.96);}
+.btn.klant{background:var(--grad-b);}
+.btn.secondary{background:transparent;border:1px solid var(--border);color:var(--cream);font-weight:600;}
+.btn.secondary:hover{border-color:var(--border-hi);filter:none;background:var(--surface);}
+.btn.block{width:100%;}
+.btn:disabled{opacity:0.35;cursor:not-allowed;filter:none;}
+.btn.small{padding:6px 11px;font-size:11px;min-height:28px;border-radius:6px;}
+.btn.boss{background:var(--grad-b);}
+.btn.danger{background:transparent;border:1px solid var(--border);color:var(--danger);font-weight:600;}
+.btn.danger:hover{background:rgba(240,100,95,0.08);border-color:rgba(240,100,95,0.4);filter:none;}
+
+/* ---------- dashboard ---------- */
+.who{display:flex;align-items:center;justify-content:space-between;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;
+  padding:13px 16px;margin-bottom:20px;flex-wrap:wrap;gap:10px;}
+.who .name{font-family:'Inter',sans-serif;font-size:14px;font-weight:600;text-transform:capitalize;display:flex;align-items:center;}
+.who .name span{color:var(--muted);font-size:11px;font-weight:400;font-family:'Inter',sans-serif;text-transform:none;
+  display:inline-flex;align-items:center;}
+.who .name span::before{content:'•';margin:0 8px;color:var(--muted-dim);font-size:8px;}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;}
+@media(max-width:680px){.grid2{grid-template-columns:1fr;}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;
+  transition:border-color .15s;
+  max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.card:hover{border-color:var(--border-hi);}
+.card h2{display:flex;align-items:center;gap:8px;font-size:13.5px;margin:0 0 4px;font-weight:600;letter-spacing:-0.005em;}
+.card h2 svg{color:var(--lime);flex-shrink:0;}
+.card p.hint{color:var(--muted);font-size:12px;margin:0 0 15px;line-height:1.55;}
+.card label{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;font-weight:600;}
+.card input[type=number],.card input[type=text],.card input[type=tel]{width:100%;background:rgba(255,255,255,0.035);
+  border:1px solid var(--border);border-radius:7px;color:var(--cream);
+  padding:10px 12px;font-family:'Space Mono',monospace;font-size:16px;transition:border-color .15s, box-shadow .15s;}
+.card input:focus{outline:none;border-color:var(--lime);box-shadow:0 0 0 3px rgba(166,242,77,0.1);}
+select.select-field{width:100%;background:rgba(255,255,255,0.035);border:1px solid var(--border);border-radius:7px;color:var(--cream);
+  padding:10px 12px;font-family:'Inter',sans-serif;font-size:14px;}
+select.select-field:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px rgba(149,132,240,0.12);}
+select.select-field option{background:#0C0F0D;color:var(--cream);}
+.preview{margin-top:10px;font-size:11.5px;color:var(--muted);min-height:16px;}
+.preview b{color:var(--lime);font-family:'Space Mono',monospace;}
+
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;
+  font-weight:600;padding:0 10px 10px 0;border-bottom:1px solid var(--border);}
+td{padding:10px 10px 10px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:13px;}
+td.num,th.num{text-align:right;font-family:'Space Mono',monospace;font-variant-numeric:tabular-nums;}
+tr.me td{background:rgba(166,242,77,0.04);}
+tr.clickable{cursor:pointer;touch-action:manipulation;transition:background .1s;}
+tr.clickable:hover td{background:rgba(255,255,255,0.025);}
+.tegoed{color:var(--lime);font-weight:700;}
+.drag-handle{cursor:grab;touch-action:none;color:var(--muted-dim);display:inline-flex;align-items:center;padding:4px;margin-right:2px;}
+.drag-handle:hover{color:var(--muted);}
+tr.dragging{opacity:0.45;background:var(--surface-hi);}
+.pill{display:inline-block;background:rgba(149,132,240,0.1);border:1px solid rgba(149,132,240,0.28);color:var(--violet);
+  font-size:9.5px;padding:2.5px 8px;border-radius:20px;letter-spacing:0.02em;font-weight:600;}
+
+.section-title{display:flex;align-items:baseline;justify-content:space-between;margin:32px 0 11px;flex-wrap:wrap;gap:8px;}
+.section-title h2{display:flex;align-items:center;gap:8px;font-size:13.5px;margin:0;font-weight:600;letter-spacing:-0.005em;}
+.section-title h2 svg{color:var(--muted);flex-shrink:0;}
+.section-title span{font-size:10.5px;color:var(--muted-dim);font-family:'Space Mono',monospace;}
+
+.log{display:flex;flex-direction:column;gap:0;}
+.entry{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:baseline;
+  padding:11px 4px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:12.5px;}
+.entry:last-child{border-bottom:none;}
+.entry .ts{color:var(--muted-dim);font-family:'Space Mono',monospace;font-size:10.5px;white-space:nowrap;}
+.entry .desc b{color:var(--cream);font-weight:600;}
+.entry .desc .sub{color:var(--muted);font-size:11px;display:block;margin-top:2px;}
+.entry .delta{font-family:'Space Mono',monospace;font-weight:700;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums;}
+.entry.inleg .delta,.entry.levering .delta{color:var(--lime);}
+.entry.ophalen .delta{color:var(--warn);}
+.empty{color:var(--muted-dim);font-size:12.5px;padding:26px 0;text-align:center;}
+
+.back-link{color:var(--muted);font-size:12px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;
+  margin-bottom:16px;cursor:pointer;background:none;border:none;font-family:'Inter',sans-serif;padding:0;font-weight:500;}
+.back-link:hover{color:var(--cream);}
+
+.klant-search{width:100%;background:rgba(255,255,255,0.035);border:1px solid var(--border);border-radius:7px;color:var(--cream);
+  padding:10px 13px;font-size:16px;margin-bottom:0;}
+.klant-search:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px rgba(149,132,240,0.12);}
+
+.klant-head{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:22px;}
+.klant-head h1{font-size:21px;margin:0 0 8px;font-weight:700;letter-spacing:-0.015em;}
+.klant-head .meta{color:var(--muted);font-size:12px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+.klant-head .meta a{color:var(--cream);text-decoration:none;}
+
+.linklike{background:none;border:none;color:var(--muted);font-size:11.5px;text-decoration:underline;padding:0;}
+.linklike:hover{color:var(--cream);}
+footer.note{margin-top:36px;color:var(--muted-dim);font-size:11px;line-height:1.65;border-top:1px solid var(--border);padding-top:16px;}
+
+.syncdot{display:inline-flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);letter-spacing:0.02em;}
+.syncdot .d{width:5px;height:5px;border-radius:50%;background:var(--cyan);}
+.syncdot.off .d{background:var(--danger);}
+
+/* ---------- loading bar ---------- */
+#loading-bar{position:fixed;top:0;left:0;height:2px;width:0;z-index:100;
+  background:var(--grad-a);opacity:0;}
+#loading-bar.active{opacity:1;width:70%;transition:width 3.5s cubic-bezier(.1,.6,.2,1);}
+#loading-bar.done{width:100%;transition:width .2s ease;}
+
+/* ---------- toasts ---------- */
+#toast-root{position:fixed;top:16px;right:16px;z-index:200;display:flex;flex-direction:column;gap:8px;
+  max-width:min(300px, calc(100vw - 32px));}
+.toast{background:#0C0F0D;border:1px solid var(--border-hi);border-radius:8px;padding:12px 14px;
+  box-shadow:0 12px 28px rgba(0,0,0,0.4);font-size:12.5px;color:var(--cream);line-height:1.4;
+  animation:toastIn .2s var(--ease) both;transition:opacity .3s;}
+.toast.error{border-color:rgba(240,100,95,0.35);}
+@keyframes toastIn{from{opacity:0;transform:translateX(16px);}to{opacity:1;transform:translateX(0);}}
+
+/* ---------- person color dot ---------- */
+.p-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:7px;flex-shrink:0;vertical-align:middle;}
+
+/* ---------- progress bar ---------- */
+.progress-wrap{margin-bottom:20px;}
+.progress-bar{height:5px;border-radius:999px;background:rgba(255,255,255,0.05);overflow:hidden;}
+.progress-fill{height:100%;background:var(--grad-a);border-radius:999px;transition:width .6s var(--ease);}
+.progress-label{margin-top:8px;font-size:11px;color:var(--muted);}
+.progress-label b{color:var(--cream);font-family:'Space Mono',monospace;font-weight:700;}
+
+/* ---------- sidebar (desktop: vaste app shell / mobiel: uitschuifbaar menu) ---------- */
+#sidebar{
+  display:flex;flex-direction:column;
+  position:fixed;top:0;left:0;bottom:0;width:240px;max-width:78vw;
+  padding:20px 14px;padding-top:max(20px, env(safe-area-inset-top));
+  border-right:1px solid var(--border);background:var(--bg);
+  z-index:70;overflow-y:auto;
+  transform:translateX(-100%);
+  transition:transform .22s var(--ease);
+}
+#sidebar.open{transform:translateX(0);box-shadow:0 0 40px rgba(0,0,0,0.5);}
+#sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(4,5,6,0.6);z-index:65;}
+#sidebar-overlay.open{display:block;}
+.menu-toggle-btn{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;
+  border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--cream);
+  cursor:pointer;flex-shrink:0;padding:0;}
+.menu-toggle-btn:hover{background:var(--surface-hi);}
+@media(min-width:880px){
+  #sidebar{width:216px;transform:none;transition:none;box-shadow:none;}
+  #sidebar-overlay,.menu-toggle-btn{display:none !important;}
+  header.top,.navtabs{display:none;}
+  .wrap{margin:0 0 0 216px;max-width:900px;padding:36px 32px 64px;}
+  .who-avatar-btn,.who-logout{display:none;}
+}
+.sidebar-brand{display:flex;align-items:center;gap:10px;padding:2px 8px 18px;margin-bottom:8px;border-bottom:1px solid var(--border);}
+.sidebar-brand h1{font-size:14.5px;margin:0;color:var(--cream);font-weight:700;letter-spacing:-0.01em;}
+.sidebar-brand p{margin:1px 0 0;font-size:10px;color:var(--muted);}
+.sidebar-nav{display:flex;flex-direction:column;gap:1px;}
+.sidebar-link{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;color:var(--muted);
+  text-decoration:none;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .12s,color .12s;}
+.sidebar-link svg{flex-shrink:0;}
+.sidebar-link:hover{background:var(--surface);color:var(--cream);}
+.sidebar-link.active{background:var(--surface-hi);color:var(--cream);}
+.sidebar-link.active svg{color:var(--lime);}
+.sidebar-link .count{margin-left:auto;font-size:10px;color:var(--muted-dim);font-family:'Space Mono',monospace;}
+.sidebar-spacer{flex:1;}
+.sidebar-footer{border-top:1px solid var(--border);padding-top:12px;margin-top:12px;display:flex;flex-direction:column;gap:6px;}
+.sidebar-footer .syncdot{padding:0 7px;margin-bottom:2px;}
+.sidebar-user{display:flex;align-items:center;gap:8px;padding:4px 2px 4px 5px;border-radius:6px;}
+.sidebar-user span{font-size:12px;font-weight:600;color:var(--cream);text-transform:capitalize;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;}
+.sidebar-gear{background:none;border:none;padding:6px;margin:0;border-radius:6px;color:var(--muted);cursor:pointer;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;transition:background .12s,color .12s;}
+.sidebar-gear:hover{background:var(--surface);color:var(--cream);}
+</style>
+</head>
+<body>
+<div id="loading-bar"></div>
+<div id="sidebar-overlay"></div>
+<aside id="sidebar"></aside>
+<div class="wrap" id="app"></div>
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<!-- Supabase JS client (UMD build, geen npm/build-stap nodig) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+/* ============================================================
+ * CONFIG — vul hier je eigen Supabase-projectgegevens in.
+ * Zie README.md voor hoe je hieraan komt. De "anon key" is
+ * bewust publiek/veilig om hier te zetten: alle echte controle
+ * gebeurt in de database via Row Level Security + functies.
+ * ============================================================ */
+const SUPABASE_URL = "https://tblkwyrmtccfggtelnsj.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_pqkMMN1YXz8mMd56_92BUQ_jKSQCfWx";
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const RATIO_IN = 3, RATIO_OUT = 1;             // leden: 3 planten -> 1 zakje
+const KLANT_RATIO_IN = 4, KLANT_RATIO_OUT = 1; // klanten: 4 geleverd -> 1 zakje
+const MAX_USERS = 25;
+const SESSION_KEY = "loods25-session";
+const BOSS_KEY = "wietloods-boss-session";
+const PROCESSING_MINUTES_PER_ZAKJE = 3; // TEST: hoeveel minuten het verwerken van 1 zakje kost
+
+let cache = { users: [], log: [], customers: [] }; // laatst opgehaalde data, voor previews
+let session = localStorage.getItem(SESSION_KEY) || null; // ingelogde user id
+let renderSeq = 0; // voorkomt dat een trage/oude fetch een nieuwere render overschrijft
+
+const ERR_MESSAGES = {
+  LOODS_VOL: 'De loods zit vol (25 profielen).',
+  ONGELDIGE_NAAM: 'Geef een geldige naam op.',
+  NAAM_BESTAAT_AL: 'Die naam bestaat al.',
+  ONGELDIGE_CODE: 'Kies een code van minstens 4 tekens.',
+  AL_GECLAIMD: 'Dit profiel is ondertussen al geclaimd door iemand anders.',
+  GEBRUIKER_NIET_GEVONDEN: 'Gebruiker niet gevonden — probeer opnieuw in te loggen.',
+  ONGELDIG_AANTAL: 'Voer een geldig aantal in.',
+  ONVOLDOENDE_TEGOED: 'Onvoldoende tegoed.',
+  KLANT_BESTAAT_AL: 'Die klant bestaat al.',
+  KLANT_NIET_GEVONDEN: 'Klant niet gevonden.',
+  ONJUISTE_BOSSCODE: 'Bosscode klopt niet meer — ontgrendel opnieuw.',
+  ONJUISTE_CODE: 'Huidige code klopt niet.'
+};
+function friendlyError(e){
+  const code = (e && e.message) ? e.message.trim() : '';
+  return ERR_MESSAGES[code] || (code || 'Er ging iets mis. Probeer opnieuw.');
+}
+
+function fmtTs(ts){
+  const d = new Date(ts);
+  return d.toLocaleDateString('nl-BE',{day:'2-digit',month:'2-digit'}) + ' · ' +
+         d.toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'});
+}
+function fmtClock(d){ return d.toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'}); }
+
+// ---------- TEST: verwerkingswachtrij (FIFO, eerst ingelegd = eerst verwerkt) ----------
+// Puur berekend uit bestaande 'inleg'-registraties (tijdstip + zakjes), schrijft niets weg.
+function computeQueueTimeline(log){
+  const entries = log.filter(e => e.type === 'inleg' && e.zakjes_delta > 0)
+    .slice().sort((a,b) => new Date(a.ts) - new Date(b.ts));
+  let freeAt = null;
+  return entries.map(e => {
+    const deposit = new Date(e.ts);
+    const start = (freeAt && freeAt > deposit) ? freeAt : deposit;
+    const minutes = e.zakjes_delta * PROCESSING_MINUTES_PER_ZAKJE;
+    const end = new Date(start.getTime() + minutes * 60000);
+    freeAt = end;
+    return { userName: e.user_name, zakjes: e.zakjes_delta, start, end, minutes };
+  });
+}
+
+let lastQueueLog = [];
+let queueTickInterval = null;
+function queueWidgetHtml(allLog){
+  lastQueueLog = allLog;
+  const timeline = computeQueueTimeline(allLog);
+  const now = new Date();
+  const active = timeline.filter(t => t.end > now);
+
+  if(active.length === 0){
+    return `<div class="card" id="queue-widget" style="margin-bottom:20px;">
+      <h2>${ICONS.clock}Verwerkingswachtrij <span class="pill" style="margin-left:6px;">TEST</span></h2>
+      <p class="hint">Eerlijk op volgorde van inleg (FIFO) — ${PROCESSING_MINUTES_PER_ZAKJE} min per zakje.</p>
+      <div class="empty">Wachtrij is momenteel leeg.</div>
+    </div>`;
+  }
+
+  const rows = active.map((t, i) => {
+    const processing = t.start <= now && now < t.end;
+    const remainingMin = Math.max(0, Math.ceil((t.end - now) / 60000));
+    const statusText = processing
+      ? `wordt verwerkt · nog ${remainingMin} min`
+      : `wacht op zijn beurt · start om ${fmtClock(t.start)}`;
+    return `<div class="entry ${processing ? 'inleg' : ''}">
+      <div class="ts">${fmtClock(t.start)}–${fmtClock(t.end)}</div>
+      <div class="desc">${personDot(t.userName)}<b>${escapeHtml(t.userName)}</b> — ${t.zakjes} zakje${t.zakjes===1?'':'s'}
+        <span class="sub">${statusText}</span>
+      </div>
+      <div class="delta">${processing ? '⏳' : '#' + (i+1)}</div>
+    </div>`;
+  }).join('');
+
+  return `<div class="card" id="queue-widget" style="margin-bottom:20px;">
+    <h2>${ICONS.clock}Verwerkingswachtrij <span class="pill" style="margin-left:6px;">TEST</span></h2>
+    <p class="hint">Eerlijk op volgorde van inleg (FIFO) — ${PROCESSING_MINUTES_PER_ZAKJE} min per zakje.</p>
+    <div class="log">${rows}</div>
+  </div>`;
+}
+function startQueueTicker(){
+  if(queueTickInterval) clearInterval(queueTickInterval);
+  queueTickInterval = setInterval(() => {
+    const el = document.getElementById('queue-widget');
+    if(!el){ clearInterval(queueTickInterval); return; }
+    el.outerHTML = queueWidgetHtml(lastQueueLog);
+  }, 20000);
+}
+
+function zakjesVoor(totalIngelegd){ return Math.floor(totalIngelegd / RATIO_IN) * RATIO_OUT; }
+function zakjesVoorKlant(totalGeleverd){ return Math.floor(totalGeleverd / KLANT_RATIO_IN) * KLANT_RATIO_OUT; }
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+async function hashPin(pin){
+  const enc = new TextEncoder().encode(pin);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// ---------- iconen (inline SVG, erven kleur via currentColor) ----------
+const ICONS = {
+  warehouse: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l9-6 9 6v11"/><path d="M9 21v-6h6v6"/></svg>`,
+  users: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.5 2.9-6 6.5-6s6.5 2.5 6.5 6"/><circle cx="17.5" cy="9" r="2.6"/><path d="M15.2 14.3c2.6.4 4.3 2.4 4.3 5.7"/></svg>`,
+  shield: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/></svg>`,
+  lock: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>`,
+  trash: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>`,
+  sprout: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-9"/><path d="M12 13c0-4 3-6 7-6 0 4-3 7-7 7"/><path d="M12 13c0-3-2.5-5-6-5 0 3.5 2.5 6 6 6"/></svg>`,
+  arrowDown: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16"/><path d="M6 14l6 6 6-6"/></svg>`,
+  truck: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="7" width="13" height="10"/><path d="M14 10h4l4 4v3h-8"/><circle cx="5.5" cy="19" r="1.7"/><circle cx="17.5" cy="19" r="1.7"/></svg>`,
+  list: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="3.5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="3.5" cy="18" r="1.4" fill="currentColor" stroke="none"/></svg>`,
+  gear: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+  menu: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>`,
+  grip: `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="6" r="1.6"/><circle cx="8" cy="12" r="1.6"/><circle cx="8" cy="18" r="1.6"/><circle cx="16" cy="6" r="1.6"/><circle cx="16" cy="12" r="1.6"/><circle cx="16" cy="18" r="1.6"/></svg>`,
+  clock: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>`
+};
+// ---------- rijen verslepen om volgorde aan te passen (muis + touch) ----------
+let rowDragState = null;
+function attachRowDrag(tbody, onReorder){
+  if(!tbody) return;
+  tbody.querySelectorAll('[data-drag-handle]').forEach(handle => {
+    handle.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const row = handle.closest('tr');
+      if(!row) return;
+      rowDragState = { tbody, row, onReorder };
+      row.classList.add('dragging');
+      document.addEventListener('pointermove', onRowDragMove);
+      document.addEventListener('pointerup', onRowDragEnd);
+    });
+  });
+}
+function onRowDragMove(e){
+  if(!rowDragState) return;
+  const { tbody, row } = rowDragState;
+  const rows = [...tbody.querySelectorAll('tr')];
+  const afterRow = rows.find(r => {
+    if(r === row) return false;
+    const rect = r.getBoundingClientRect();
+    return e.clientY < rect.top + rect.height / 2;
+  });
+  if(afterRow) tbody.insertBefore(row, afterRow);
+  else tbody.appendChild(row);
+}
+async function onRowDragEnd(){
+  document.removeEventListener('pointermove', onRowDragMove);
+  document.removeEventListener('pointerup', onRowDragEnd);
+  if(!rowDragState) return;
+  const { tbody, row, onReorder } = rowDragState;
+  row.classList.remove('dragging');
+  rowDragState = null;
+  const ids = [...tbody.querySelectorAll('tr')].map(r => r.getAttribute('data-drag-id')).filter(Boolean);
+  await onReorder(ids);
+}
+
+function openMobileMenu(){
+  document.getElementById('sidebar')?.classList.add('open');
+  document.getElementById('sidebar-overlay')?.classList.add('open');
+}
+function closeMobileMenu(){
+  document.getElementById('sidebar')?.classList.remove('open');
+  document.getElementById('sidebar-overlay')?.classList.remove('open');
+}
+function fmtNum(n){ return Number(n).toLocaleString('nl-BE'); }
+
+// ---------- unieke kleur per persoon (herkenbaar in avatars/tabellen/log) ----------
+// Elke geregistreerde gebruiker krijgt een eigen plek (op volgorde van aansluiten),
+// en elke plek krijgt een kleurtint die met de gulden hoek gespreid is over het
+// kleurenwiel — zo krijgt niemand dezelfde kleur, ook niet bij 25 profielen.
+const GOLDEN_ANGLE = 137.508;
+function hslToHex(h, s, l){
+  s /= 100; l /= 100;
+  const k = n => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  const toHex = x => Math.round(255 * x).toString(16).padStart(2, '0');
+  return '#' + toHex(f(0)) + toHex(f(8)) + toHex(f(4));
+}
+function personIndex(name){
+  const sorted = [...cache.users].sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+  const idx = sorted.findIndex(u => u.name === name);
+  if(idx >= 0) return idx;
+  // naam niet (meer) in cache.users (bv. verwijderd profiel in oud logboek) —
+  // geef toch een stabiele, ver-weg-liggende kleur zodat botsing onwaarschijnlijk is
+  let h = 1000;
+  for(let i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i)) >>> 0;
+  return h % 500 + 500;
+}
+// Handmatige uitzonderingen op de automatische kleurtoewijzing (naam in kleine letters).
+const PERSON_COLOR_OVERRIDES = {
+  bob: '#2A62AC' // Porsche Shark Blue (benadering — geen officiële hex bestaat)
+};
+function personColor(name){
+  const override = PERSON_COLOR_OVERRIDES[name.trim().toLowerCase()];
+  if(override) return override;
+  const hue = (personIndex(name) * GOLDEN_ANGLE) % 360;
+  return hslToHex(hue, 68, 62);
+}
+function personDot(name){
+  return `<span class="p-dot" style="background:${personColor(name)};"></span>`;
+}
+
+// ---------- profielfoto: weergave, verkleinen, uploaden ----------
+function avatarCircleHtml(user, size){
+  const radius = Math.max(5, Math.round(size * 0.2));
+  if(user.avatar_url){
+    return `<div class="avatar-photo" style="width:${size}px;height:${size}px;border-radius:${radius}px;background-image:url('${escapeHtml(user.avatar_url)}');"></div>`;
+  }
+  return `<div class="avatar-photo" style="width:${size}px;height:${size}px;border-radius:${radius}px;background:${personColor(user.name)};font-size:${Math.round(size*0.42)}px;">${escapeHtml(user.name.charAt(0).toUpperCase())}</div>`;
+}
+
+function downscaleImage(file, maxSize, quality){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if(width > height){ if(width > maxSize){ height = Math.round(height * maxSize / width); width = maxSize; } }
+        else { if(height > maxSize){ width = Math.round(width * maxSize / height); height = maxSize; } }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('kon foto niet verwerken')), 'image/jpeg', quality);
+      };
+      img.onerror = () => reject(new Error('ongeldige afbeelding'));
+      img.src = reader.result;
+    };
+    reader.onerror = () => reject(new Error('kon bestand niet lezen'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadAvatar(file, userId){
+  const blob = await downscaleImage(file, 256, 0.82);
+  const path = `${userId}.jpg`;
+  const { error: upErr } = await sb.storage.from('avatars').upload(path, blob, { upsert: true, contentType: 'image/jpeg' });
+  if(upErr) throw upErr;
+  const { data } = sb.storage.from('avatars').getPublicUrl(path);
+  const url = data.publicUrl + '?v=' + Date.now(); // cache-bust zodat de nieuwe foto meteen zichtbaar is
+  const { error } = await sb.rpc('fn_set_avatar', { p_user_id: userId, p_avatar_url: url });
+  if(error) throw error;
+}
+
+// ---------- laadbalk ----------
+function loadingBarStart(){
+  const bar = document.getElementById('loading-bar');
+  if(!bar) return;
+  bar.classList.remove('done');
+  void bar.offsetWidth; // forceer reflow zodat de transition herstart
+  bar.classList.add('active');
+}
+function loadingBarDone(){
+  const bar = document.getElementById('loading-bar');
+  if(!bar) return;
+  bar.classList.add('done');
+  setTimeout(()=>{ bar.classList.remove('active','done'); bar.style.width=''; }, 250);
+}
+
+// ---------- toasts ----------
+function showToast(message, type){
+  const root = document.getElementById('toast-root');
+  if(!root) return;
+  const el = document.createElement('div');
+  el.className = 'toast' + (type==='error' ? ' error' : '');
+  el.textContent = message;
+  root.appendChild(el);
+  setTimeout(()=>{
+    el.style.opacity = '0';
+    setTimeout(()=> el.remove(), 300);
+  }, 4200);
+}
+
+function getHash(){
+  const h = window.location.hash.replace(/^#\/?/, '');
+  return h.split('/').filter(Boolean); // e.g. [] , ['klanten'], ['klant','abc123']
+}
+function goTo(hash){ window.location.hash = hash; }
+
+// ---------- data laden ----------
+async function fetchUsers(){
+  const { data, error } = await sb.from('users_public').select('*').order('sort_order', {ascending:true, nullsFirst:false}).order('name');
+  if(error){ console.error(error); return []; }
+  return data;
+}
+async function fetchLoodsLog(limit=80){
+  const { data, error } = await sb.from('loods_log').select('*').order('ts',{ascending:false}).limit(limit);
+  if(error){ console.error(error); return []; }
+  return data;
+}
+async function fetchCustomers(){
+  const { data, error } = await sb.from('customers').select('*').order('name');
+  if(error){ console.error(error); return []; }
+  return data;
+}
+async function fetchCustomer(id){
+  const { data, error } = await sb.from('customers').select('*').eq('id', id).maybeSingle();
+  if(error){ console.error(error); return null; }
+  return data;
+}
+async function fetchCustomerLog(customerId, limit=100){
+  const { data, error } = await sb.from('customer_log').select('*').eq('customer_id', customerId)
+    .order('ts',{ascending:false}).limit(limit);
+  if(error){ console.error(error); return []; }
+  return data;
+}
+async function fetchAllLoodsLog(limit=2000){
+  const { data, error } = await sb.from('loods_log').select('*').order('ts',{ascending:false}).limit(limit);
+  if(error){ console.error(error); return []; }
+  return data;
+}
+async function fetchAllCustomerLog(limit=2000){
+  const { data, error } = await sb.from('customer_log').select('*').order('ts',{ascending:false}).limit(limit);
+  if(error){ console.error(error); return []; }
+  return data;
+}
+function getUser(id){ return cache.users.find(u => u.id === id); }
+function getKlant(id){ return cache.customers.find(c => c.id === id); }
+function clearSessionIfMissing(){
+  if(session && !getUser(session)){ session = null; localStorage.removeItem(SESSION_KEY); }
+}
+function isBossUnlocked(){ return !!sessionStorage.getItem(BOSS_KEY); }
+function bossPinHash(){ return sessionStorage.getItem(BOSS_KEY); }
+
+// ---------- boot ----------
+async function boot(){
+  render(`<div class="empty">Varrios Wietloods wordt geopend…</div>`);
+  document.getElementById('sidebar-overlay')?.addEventListener('click', closeMobileMenu);
+  await render();
+  window.addEventListener('hashchange', render);
+  setupRealtime();
+}
+
+let pendingRerender = false;
+function setupRealtime(){
+  sb.channel('loods25-changes')
+    .on('postgres_changes', {event:'*', schema:'public', table:'users'}, queueRerender)
+    .on('postgres_changes', {event:'*', schema:'public', table:'loods_log'}, queueRerender)
+    .on('postgres_changes', {event:'*', schema:'public', table:'customers'}, queueRerender)
+    .on('postgres_changes', {event:'*', schema:'public', table:'customer_log'}, queueRerender)
+    .subscribe();
+}
+function queueRerender(){
+  if(pendingRerender) return;
+  pendingRerender = true;
+  setTimeout(()=>{ pendingRerender = false; render(); }, 300);
+}
+
+async function render(overrideHtml){
+  const app = document.getElementById('app');
+  if(typeof overrideHtml === 'string'){ app.innerHTML = overrideHtml; return; }
+  closeMobileMenu(); // elke echte navigatie sluit het mobiele uitklapmenu
+
+  function mount(html, attachFn){
+    renderSidebar();
+    app.innerHTML = html;
+    loadingBarDone();
+    if(attachFn) attachFn();
+  }
+
+  const mySeq = ++renderSeq;
+  loadingBarStart();
+  cache.users = await fetchUsers();
+  cache.customers = await fetchCustomers();
+  clearSessionIfMissing();
+
+  const path = getHash();
+
+  if(path[0] === 'boss'){
+    if(!isBossUnlocked()){
+      if(mySeq !== renderSeq) return;
+      mount(bossLockedView(), attachBossLockedHandlers);
+      return;
+    }
+    const allLog = await fetchAllLoodsLog();
+    const allCustLog = await fetchAllCustomerLog();
+    if(mySeq !== renderSeq) return;
+    mount(bossView(allLog, allCustLog), attachBossHandlers);
+    return;
+  }
+
+  if(!session){
+    if(mySeq !== renderSeq) return;
+    mount(loginView(), attachLoginHandlers);
+    return;
+  }
+
+  if(path[0] === 'klanten'){
+    if(mySeq !== renderSeq) return;
+    mount(klantenListView(), attachKlantenListHandlers);
+  } else if(path[0] === 'klant' && path[1]){
+    const k = await fetchCustomer(path[1]);
+    if(!k){ goTo('/klanten'); return; }
+    const klantLog = await fetchCustomerLog(k.id);
+    if(mySeq !== renderSeq) return;
+    mount(klantDetailView(k, klantLog), () => attachKlantDetailHandlers(k));
+  } else {
+    cache.log = await fetchLoodsLog();
+    const allInlegLog = await fetchAllLoodsLog(); // TEST: volledige historiek voor de wachtrij-berekening
+    if(mySeq !== renderSeq) return;
+    mount(dashboardView(allInlegLog), attachDashboardHandlers);
+  }
+}
+
+function renderSidebar(){
+  const el = document.getElementById('sidebar');
+  if(!el) return;
+  const path = getHash();
+  const active = path[0] === 'boss' ? 'boss' : (path[0] === 'klanten' || path[0] === 'klant') ? 'klanten' : 'loods';
+  const me = session ? getUser(session) : null;
+  el.innerHTML = `
+    <div class="sidebar-brand">
+      <img src="logo.png" alt="Varrios Los Aztecas" class="brand-logo">
+      <div><h1>Varrios Wietloods</h1><p>Voorraadmanifest</p></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="sidebar-link ${active==='loods'?'active':''}" data-nav="/">${ICONS.warehouse}<span>Loods</span></a>
+      <a class="sidebar-link ${active==='klanten'?'active':''}" data-nav="/klanten">${ICONS.users}<span>Klanten</span><span class="count">${cache.customers.length}</span></a>
+      <a class="sidebar-link ${active==='boss'?'active':''}" data-boss="1">${ICONS.shield}<span>Boss menu</span></a>
+    </nav>
+    <div class="sidebar-spacer"></div>
+    <div class="sidebar-footer">
+      <span class="syncdot"><span class="d"></span>live gedeeld</span>
+      ${me ? `
+        <div class="sidebar-user">
+          ${avatarCircleHtml(me,28)}
+          <span>${escapeHtml(me.name)}</span>
+          <button class="sidebar-gear" data-edit-avatar="1" title="Profielinstellingen">${ICONS.gear}</button>
+        </div>
+        <button class="btn secondary small" data-logout="1">Uitloggen</button>
+      ` : ''}
+    </div>
+  `;
+}
+
+function navTabsHtml(active){
+  return `
+    <div class="navtabs">
+      <div class="navtab ${active==='loods'?'active':''}" data-nav="/">${ICONS.warehouse}Loods</div>
+      <div class="navtab ${active==='klanten'?'active':''}" data-nav="/klanten">${ICONS.users}Klanten (${cache.customers.length})</div>
+    </div>`;
+}
+
+function headerHtml(kind){
+  const isKlant = kind === 'klant';
+  return `
+    <header class="top">
+      <div class="brand">
+        <img src="logo.png" alt="Varrios Los Aztecas" class="brand-logo">
+        <div>
+          <h1>Varrios Wietloods</h1>
+          <p>Gezamenlijk voorraadmanifest</p>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span class="syncdot"><span class="d"></span>live gedeeld</span>
+        <button class="menu-toggle-btn" id="menu-toggle" aria-label="Menu">${ICONS.menu}</button>
+      </div>
+    </header>`;
+}
+
+// ---------- LOGIN VIEW ----------
+function loginView(){
+  const tagsHtml = cache.users.map(u => `
+    <div class="avatar-tile ${u.claimed ? '' : 'unclaimed'}" data-select="${u.id}">
+      ${avatarCircleHtml(u, 36)}
+      <div class="nm">${escapeHtml(u.name)}</div>
+      <div class="st"><span class="dot"></span>${u.claimed ? 'actief' : 'nog vrij'}</div>
+    </div>
+  `).join('');
+  const addTile = cache.users.length < MAX_USERS ? `
+    <div class="avatar-tile add" data-add="1">
+      <div class="avatar-circle">+</div>
+      <div class="nm">Nieuw</div>
+      <div class="st">profiel</div>
+    </div>` : '';
+
+  return `
+    ${headerHtml()}
+    <div class="login-shell">
+      <h2>Wie ben jij?</h2>
+      <p class="sub">Kies je profiel en meld je aan met je code.<br>Nog geen profiel? Maak er zelf een aan (max ${MAX_USERS} in totaal — nu ${cache.users.length}).</p>
+      <div class="avatar-grid">${tagsHtml}${addTile}</div>
+    </div>
+  `;
+}
+
+// ---------- DASHBOARD VIEW (loods) ----------
+function dashboardView(allInlegLog){
+  const me = getUser(session);
+  const totalIngelegd = cache.users.reduce((s,u)=>s+u.total_ingelegd,0);
+  const totalZakjesToegekend = cache.users.reduce((s,u)=>s+zakjesVoor(u.total_ingelegd),0);
+  const totalOpgehaald = cache.users.reduce((s,u)=>s+u.opgehaald,0);
+  const myZakjes = zakjesVoor(me.total_ingelegd);
+  const myTegoed = myZakjes - me.opgehaald;
+
+  const rows = [...cache.users].sort((a,b)=> (zakjesVoor(b.total_ingelegd)-b.opgehaald) - (zakjesVoor(a.total_ingelegd)-a.opgehaald))
+    .map(u => {
+      const z = zakjesVoor(u.total_ingelegd);
+      const tegoed = z - u.opgehaald;
+      return `<tr class="${u.id===me.id?'me':''}">
+        <td>${personDot(u.name)}${escapeHtml(u.name)}</td>
+        <td class="num">${fmtNum(u.total_ingelegd)}</td>
+        <td class="num">${fmtNum(z)}</td>
+        <td class="num">${fmtNum(u.opgehaald)}</td>
+        <td class="num tegoed">${fmtNum(tegoed)}</td>
+      </tr>`;
+    }).join('');
+
+  const logEntries = cache.log.map(e => {
+    if(e.type === 'inleg'){
+      return `<div class="entry inleg">
+        <div class="ts">${fmtTs(e.ts)}</div>
+        <div class="desc">${personDot(e.user_name)}<b>${escapeHtml(e.user_name)}</b> legde ${e.amount} planten in
+          <span class="sub">totaal ${e.cumulative_after} planten · zakjes toegekend: ${e.zakjes_after}</span>
+        </div>
+        <div class="delta">+${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'}</div>
+      </div>`;
+    }
+    return `<div class="entry ophalen">
+      <div class="ts">${fmtTs(e.ts)}</div>
+      <div class="desc">${personDot(e.user_name)}<b>${escapeHtml(e.user_name)}</b> haalde zakjes op
+        <span class="sub">resterend tegoed: ${e.tegoed_after}</span>
+      </div>
+      <div class="delta">−${e.amount} zakje${e.amount===1?'':'s'}</div>
+    </div>`;
+  }).join('');
+
+  return `
+    ${headerHtml()}
+    ${navTabsHtml('loods')}
+
+    <div class="who">
+      <div class="name"><button class="who-avatar-btn" data-edit-avatar="1" title="Profielfoto wijzigen">${avatarCircleHtml(me, 26)}</button>${escapeHtml(me.name)}<span>${myTegoed} zakje${myTegoed===1?'':'s'} tegoed op dit moment</span></div>
+      <button class="btn secondary who-logout" data-logout="1">Uitloggen</button>
+    </div>
+
+    <div class="totals" style="margin-bottom:22px;">
+      <div class="t"><div class="n">${fmtNum(totalIngelegd)}</div><div class="l">planten in loods</div></div>
+      <div class="t"><div class="n">${fmtNum(totalZakjesToegekend)}</div><div class="l">zakjes toegekend</div></div>
+      <div class="t"><div class="n">${fmtNum(totalOpgehaald)}</div><div class="l">al opgehaald</div></div>
+      <div class="t"><div class="n tegoed">${fmtNum(totalZakjesToegekend - totalOpgehaald)}</div><div class="l">nog tegoed</div></div>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" style="width:${totalZakjesToegekend>0 ? Math.min(100, Math.round(totalOpgehaald/totalZakjesToegekend*100)) : 0}%"></div></div>
+      <div class="progress-label"><b>${totalOpgehaald}</b> van <b>${totalZakjesToegekend}</b> toegekende zakjes al opgehaald (${totalZakjesToegekend>0 ? Math.round(totalOpgehaald/totalZakjesToegekend*100) : 0}%)</div>
+    </div>
+
+    ${queueWidgetHtml(allInlegLog)}
+
+    <div class="grid2">
+      <div class="card">
+        <h2>${ICONS.sprout}Planten inleggen</h2>
+        <p class="hint">Geef door hoeveel planten je in de loods hebt gelegd. Wordt meteen opgeteld bij het totaal (${me.total_ingelegd} nu) en omgerekend: <b>elke ${RATIO_IN} planten leveren ${RATIO_OUT} zakje op, dus ${RATIO_IN}/${RATIO_OUT}</b>.</p>
+        <label for="in-amount">Aantal planten</label>
+        <input type="number" id="in-amount" min="1" step="1" placeholder="bv. 120">
+        <div class="preview" id="in-preview"></div>
+        <div style="margin-top:14px;"><button class="btn block" id="in-submit">Inleg registreren</button></div>
+        <div class="err" id="in-err"></div>
+      </div>
+
+      <div class="card">
+        <h2>${ICONS.arrowDown}Zakjes ophalen</h2>
+        <p class="hint">Je hebt nu <b class="mono" style="color:var(--lime)">${myTegoed}</b> zakje${myTegoed===1?'':'s'} tegoed. Registreer hier hoeveel je meeneemt zodat iedereen kan zien wat er nog in de loods ligt.</p>
+        <label for="out-amount">Aantal zakjes ophalen</label>
+        <input type="number" id="out-amount" min="1" step="1" max="${myTegoed}" placeholder="bv. 20" ${myTegoed<=0?'disabled':''}>
+        <div style="margin-top:14px;"><button class="btn block secondary" id="out-submit" ${myTegoed<=0?'disabled':''}>Ophalen registreren</button></div>
+        <div class="err" id="out-err"></div>
+      </div>
+    </div>
+
+    <div class="section-title"><h2>${ICONS.users}Overzicht per profiel</h2><span>${cache.users.length}/${MAX_USERS} profielen</span></div>
+    <div class="card" style="padding:14px 20px;">
+      <table>
+        <thead><tr><th>Naam</th><th class="num">Ingelegd</th><th class="num">Zakjes</th><th class="num">Opgehaald</th><th class="num">Tegoed</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+
+    <div class="section-title"><h2>${ICONS.list}Volledig logboek</h2><span>laatste ${cache.log.length} registraties</span></div>
+    <div class="card" style="padding:6px 20px;">
+      <div class="log">${logEntries || '<div class="empty">Nog geen registraties.</div>'}</div>
+    </div>
+
+    <footer class="note">
+      Elke inleg en elke opname wordt hier met naam en tijdstip vastgelegd — dit logboek is voor iedereen zichtbaar,
+      zodat achteraf altijd na te gaan is wie wat heeft ingelegd of opgehaald. De code (pin) voorkomt dat iemand
+      anders onder jouw naam registreert; het is geen zware beveiliging, maar wel genoeg om vergissingen en
+      misverstanden tussen jullie 25 te vermijden.
+    </footer>
+  `;
+}
+
+// ---------- KLANTEN LIST VIEW ----------
+function klantenListView(){
+  const totalGeleverd = cache.customers.reduce((s,c)=>s+c.total_geleverd,0);
+  const totalZakjes = cache.customers.reduce((s,c)=>s+zakjesVoorKlant(c.total_geleverd),0);
+
+  const rows = [...cache.customers].sort((a,b)=>a.name.localeCompare(b.name)).map(c => {
+    const z = zakjesVoorKlant(c.total_geleverd);
+    return `<tr class="clickable" data-goto-klant="${c.id}">
+      <td>${escapeHtml(c.name)}</td>
+      <td>${c.groep ? `<span class="pill">${escapeHtml(c.groep)}</span>` : ''}</td>
+      <td class="num">${fmtNum(c.total_geleverd)}</td>
+      <td class="num tegoed">${fmtNum(z)}</td>
+    </tr>`;
+  }).join('');
+
+  return `
+    ${headerHtml('klant')}
+    ${navTabsHtml('klanten')}
+
+    <div class="who">
+      <div class="name"><button class="who-avatar-btn" data-edit-avatar="1" title="Profielfoto wijzigen">${avatarCircleHtml(getUser(session), 26)}</button>${escapeHtml(getUser(session).name)}<span>ingelogd</span></div>
+      <button class="btn secondary who-logout" data-logout="1">Uitloggen</button>
+    </div>
+
+    <div class="totals" style="margin-bottom:22px;">
+      <div class="t"><div class="n">${fmtNum(cache.customers.length)}</div><div class="l">klanten</div></div>
+      <div class="t"><div class="n">${fmtNum(totalGeleverd)}</div><div class="l">totaal geleverd</div></div>
+      <div class="t"><div class="n">${fmtNum(totalZakjes)}</div><div class="l">zakjes meegekregen</div></div>
+    </div>
+
+    <div class="section-title"><h2>${ICONS.users}Klantenbestand</h2><span>omrekening: ${KLANT_RATIO_IN}:${KLANT_RATIO_OUT}</span></div>
+    <div class="card">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <input type="text" class="klant-search" id="klant-search" placeholder="Zoek op naam of groep…" style="flex:1;min-width:180px;">
+        <button class="btn klant" id="klant-add">+ Nieuwe klant</button>
+      </div>
+      <p class="hint" style="margin:14px 0 0;">Iedereen in de loods kan hier klanten aanmaken en leveringen invullen — dit bestand is gezamenlijk, niet persoonlijk.</p>
+    </div>
+
+    <div class="card" style="padding:14px 20px;margin-top:16px;">
+      <table id="klant-table">
+        <thead><tr><th>Naam</th><th>Groep</th><th class="num">Geleverd</th><th class="num">Zakjes</th></tr></thead>
+        <tbody id="klant-tbody">${rows || ''}</tbody>
+      </table>
+      ${cache.customers.length===0 ? '<div class="empty">Nog geen klanten aangemaakt.</div>' : ''}
+    </div>
+  `;
+}
+
+// ---------- KLANT DETAIL VIEW (eigen pagina) ----------
+function klantDetailView(k, klantLog){
+  const z = zakjesVoorKlant(k.total_geleverd);
+
+  const entries = klantLog.map(e => {
+    return `<div class="entry levering">
+      <div class="ts">${fmtTs(e.ts)}</div>
+      <div class="desc">${e.amount} geleverd — ingevuld door ${personDot(e.by_user_name)}<b>${escapeHtml(e.by_user_name)}</b>
+        <span class="sub">totaal ${e.cumulative_after} · direct meegekregen: ${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'}</span>
+      </div>
+      <div class="delta">+${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'}</div>
+    </div>`;
+  }).join('');
+
+  return `
+    ${headerHtml('klant')}
+    ${navTabsHtml('klanten')}
+    <button class="back-link" data-goto="/klanten">&larr; Terug naar klantenbestand</button>
+
+    <div class="klant-head">
+      <div>
+        <h1>${escapeHtml(k.name)}</h1>
+        <div class="meta">
+          ${k.groep ? `<span class="pill">${escapeHtml(k.groep)}</span>` : ''}
+          ${k.phone ? `<a href="tel:${escapeHtml(k.phone)}">${escapeHtml(k.phone)}</a>` : '<span>geen telefoonnummer</span>'}
+        </div>
+      </div>
+      <div class="totals">
+        <div class="t"><div class="n">${fmtNum(k.total_geleverd)}</div><div class="l">geleverd</div></div>
+        <div class="t"><div class="n tegoed">${fmtNum(z)}</div><div class="l">zakjes meegekregen</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span style="color:var(--violet);display:inline-flex;">${ICONS.truck}</span>Levering registreren</h2>
+      <p class="hint">Vul in hoeveel ${escapeHtml(k.name)} geleverd heeft. Wordt opgeteld bij het totaal (${k.total_geleverd} nu). Bij klanten geldt: elke ${KLANT_RATIO_IN} geleverd = ${KLANT_RATIO_OUT} zakje, en die krijgen ze er meteen bij mee — er wordt dus niets tegoed gehouden.</p>
+      <label for="kl-amount">Aantal geleverd</label>
+      <input type="number" id="kl-amount" min="1" step="1" placeholder="bv. 40">
+      <div class="preview" id="kl-preview"></div>
+      <div style="margin-top:14px;"><button class="btn klant block" id="kl-submit">Registreren</button></div>
+      <div class="err" id="kl-err"></div>
+    </div>
+
+    <div class="section-title"><h2>${ICONS.list}Geschiedenis van ${escapeHtml(k.name)}</h2><span>${klantLog.length} registraties</span></div>
+    <div class="card" style="padding:6px 20px;">
+      <div class="log">${entries || '<div class="empty">Nog geen registraties voor deze klant.</div>'}</div>
+    </div>
+  `;
+}
+
+// ---------- modals ----------
+function showModal(html){
+  document.getElementById('modal-root').innerHTML = `<div class="modal-bg" id="modal-bg">${html}</div>`;
+  document.getElementById('modal-bg').addEventListener('click', (e)=>{ if(e.target.id==='modal-bg') closeModal(); });
+}
+function closeModal(){
+  const root = document.getElementById('modal-root');
+  if(root) root.innerHTML = '';
+}
+
+function claimModal(user){
+  showModal(`<div class="modal">
+    <h3>${escapeHtml(user.name)} claimen</h3>
+    <p class="hint">Dit profiel is nog niet in gebruik. Stel een code (4 cijfers of meer) in zodat alleen jij hierop kan inloggen.</p>
+    <label>Nieuwe code</label>
+    <input type="password" inputmode="numeric" id="claim-pin" placeholder="••••" maxlength="8">
+    <div class="err" id="claim-err"></div>
+    <div class="row-btns">
+      <button class="btn secondary" id="claim-cancel" style="flex:1">Annuleren</button>
+      <button class="btn" id="claim-ok" style="flex:1">Profiel claimen</button>
+    </div>
+  </div>`);
+  document.getElementById('claim-cancel').onclick = closeModal;
+  document.getElementById('claim-ok').onclick = async () => {
+    const pin = document.getElementById('claim-pin').value.trim();
+    const err = document.getElementById('claim-err');
+    if(pin.length < 4){ err.textContent = 'Kies een code van minstens 4 tekens.'; return; }
+    const pinHash = await hashPin(pin);
+    const { error } = await sb.rpc('fn_claim_profile', { p_user_id: user.id, p_pin_hash: pinHash });
+    if(error){ err.textContent = friendlyError(error); return; }
+    session = user.id;
+    localStorage.setItem(SESSION_KEY, session);
+    closeModal();
+    goTo('/');
+    render();
+  };
+}
+
+function loginModal(user){
+  showModal(`<div class="modal">
+    <h3>Inloggen als ${escapeHtml(user.name)}</h3>
+    <p class="hint">Voer je code in.</p>
+    <label>Code</label>
+    <input type="password" inputmode="numeric" id="login-pin" placeholder="••••" maxlength="8">
+    <div class="err" id="login-err"></div>
+    <div class="row-btns">
+      <button class="btn secondary" id="login-cancel" style="flex:1">Annuleren</button>
+      <button class="btn" id="login-ok" style="flex:1">Inloggen</button>
+    </div>
+  </div>`);
+  document.getElementById('login-cancel').onclick = closeModal;
+  const tryLogin = async () => {
+    const pin = document.getElementById('login-pin').value.trim();
+    const err = document.getElementById('login-err');
+    const pinHash = await hashPin(pin);
+    const { data, error } = await sb.rpc('fn_verify_login', { p_user_id: user.id, p_pin_hash: pinHash });
+    if(error || !data){ err.textContent = 'Onjuiste code, probeer opnieuw.'; return; }
+    session = user.id;
+    localStorage.setItem(SESSION_KEY, session);
+    closeModal();
+    goTo('/');
+    render();
+  };
+  document.getElementById('login-ok').onclick = tryLogin;
+  document.getElementById('login-pin').addEventListener('keydown', e => { if(e.key==='Enter') tryLogin(); });
+}
+
+function addProfileModal(){
+  showModal(`<div class="modal">
+    <h3>Nieuw profiel</h3>
+    <p class="hint">Er is plaats voor ${MAX_USERS - cache.users.length} extra profiel(en).</p>
+    <label>Naam</label>
+    <input type="text" id="add-name" maxlength="24" placeholder="bv. tibo">
+    <label>Code</label>
+    <input type="password" inputmode="numeric" id="add-pin" placeholder="••••" maxlength="8">
+    <div class="err" id="add-err"></div>
+    <div class="row-btns">
+      <button class="btn secondary" id="add-cancel" style="flex:1">Annuleren</button>
+      <button class="btn" id="add-ok" style="flex:1">Aanmaken</button>
+    </div>
+  </div>`);
+  document.getElementById('add-cancel').onclick = closeModal;
+  document.getElementById('add-ok').onclick = async () => {
+    const name = document.getElementById('add-name').value.trim();
+    const pin = document.getElementById('add-pin').value.trim();
+    const err = document.getElementById('add-err');
+    if(!name){ err.textContent = 'Geef een naam op.'; return; }
+    if(pin.length < 4){ err.textContent = 'Kies een code van minstens 4 tekens.'; return; }
+    const pinHash = await hashPin(pin);
+    const { data, error } = await sb.rpc('fn_create_profile', { p_name: name, p_pin_hash: pinHash });
+    if(error){ err.textContent = friendlyError(error); return; }
+    session = data.id;
+    localStorage.setItem(SESSION_KEY, session);
+    closeModal();
+    goTo('/');
+    render();
+  };
+}
+
+function profileSettingsModal(user){
+  showModal(`<div class="modal">
+    <h3>Profielinstellingen</h3>
+    <p class="hint">Wijzigingen gelden voor jouw eigen profiel.</p>
+
+    <label>Naam</label>
+    <input type="text" id="pset-name" maxlength="24" value="${escapeHtml(user.name)}">
+    <div class="err" id="pset-name-err"></div>
+    <div style="margin-top:9px;"><button class="btn secondary small" id="pset-name-save">Naam opslaan</button></div>
+
+    <label>Profielfoto</label>
+    <input type="file" accept="image/*" id="pset-avatar-file" style="width:100%;color:var(--muted);font-size:12.5px;">
+    <div class="err" id="pset-avatar-err"></div>
+    <div style="margin-top:9px;"><button class="btn secondary small" id="pset-avatar-save">Foto uploaden</button></div>
+
+    <label>Code wijzigen</label>
+    <input type="password" inputmode="numeric" id="pset-pin-old" placeholder="Huidige code" maxlength="8" style="margin-bottom:8px;">
+    <input type="password" inputmode="numeric" id="pset-pin-new" placeholder="Nieuwe code (min. 4 tekens)" maxlength="8">
+    <div class="err" id="pset-pin-err"></div>
+    <div style="margin-top:9px;"><button class="btn secondary small" id="pset-pin-save">Code wijzigen</button></div>
+
+    <div class="row-btns">
+      <button class="btn" id="pset-close" style="flex:1">Sluiten</button>
+    </div>
+  </div>`);
+
+  document.getElementById('pset-close').onclick = closeModal;
+
+  document.getElementById('pset-name-save').onclick = async () => {
+    const name = document.getElementById('pset-name').value.trim();
+    const err = document.getElementById('pset-name-err');
+    const btn = document.getElementById('pset-name-save');
+    if(!name){ err.textContent = 'Geef een naam op.'; return; }
+    btn.disabled = true;
+    const { error } = await sb.rpc('fn_update_name', { p_user_id: user.id, p_new_name: name });
+    btn.disabled = false;
+    if(error){ err.textContent = friendlyError(error); return; }
+    err.textContent = '';
+    closeModal();
+    showToast('Naam bijgewerkt.');
+    render();
+  };
+
+  document.getElementById('pset-avatar-save').onclick = async () => {
+    const fileInput = document.getElementById('pset-avatar-file');
+    const err = document.getElementById('pset-avatar-err');
+    const file = fileInput.files[0];
+    if(!file){ err.textContent = 'Kies eerst een foto.'; return; }
+    if(file.size > 8*1024*1024){ err.textContent = 'Bestand is te groot (max 8MB).'; return; }
+    const btn = document.getElementById('pset-avatar-save');
+    btn.disabled = true; btn.textContent = 'Bezig…';
+    try{
+      await uploadAvatar(file, user.id);
+      closeModal();
+      showToast('Profielfoto bijgewerkt.');
+      render();
+    }catch(e){
+      console.error(e);
+      err.textContent = 'Upload mislukt. Probeer opnieuw.';
+      btn.disabled = false; btn.textContent = 'Foto uploaden';
+    }
+  };
+
+  document.getElementById('pset-pin-save').onclick = async () => {
+    const oldPin = document.getElementById('pset-pin-old').value.trim();
+    const newPin = document.getElementById('pset-pin-new').value.trim();
+    const err = document.getElementById('pset-pin-err');
+    if(newPin.length < 4){ err.textContent = 'Nieuwe code moet minstens 4 tekens zijn.'; return; }
+    const btn = document.getElementById('pset-pin-save');
+    btn.disabled = true;
+    const oldHash = await hashPin(oldPin);
+    const newHash = await hashPin(newPin);
+    const { data, error } = await sb.rpc('fn_change_pin', { p_user_id: user.id, p_old_pin_hash: oldHash, p_new_pin_hash: newHash });
+    btn.disabled = false;
+    if(error || !data){ err.textContent = friendlyError(error); return; }
+    err.textContent = '';
+    document.getElementById('pset-pin-old').value = '';
+    document.getElementById('pset-pin-new').value = '';
+    showToast('Code gewijzigd.');
+  };
+}
+
+function addKlantModal(){
+  showModal(`<div class="modal">
+    <h3>Nieuwe klant</h3>
+    <p class="hint">Maak een klantenpagina aan. Iedereen in de loods kan hier later leveringen op registreren.</p>
+    <label>Naam</label>
+    <input type="text" id="kadd-name" maxlength="60" placeholder="bv. Café De Kroon">
+    <label>Telefoonnummer</label>
+    <input type="tel" id="kadd-phone" maxlength="30" placeholder="bv. 0470 12 34 56">
+    <label>Groep</label>
+    <input type="text" id="kadd-groep" maxlength="40" placeholder="bv. Noord">
+    <div class="err" id="kadd-err"></div>
+    <div class="row-btns">
+      <button class="btn secondary" id="kadd-cancel" style="flex:1">Annuleren</button>
+      <button class="btn klant" id="kadd-ok" style="flex:1">Aanmaken</button>
+    </div>
+  </div>`);
+  document.getElementById('kadd-cancel').onclick = closeModal;
+  document.getElementById('kadd-ok').onclick = async () => {
+    const name = document.getElementById('kadd-name').value.trim();
+    const phone = document.getElementById('kadd-phone').value.trim();
+    const groep = document.getElementById('kadd-groep').value.trim();
+    const err = document.getElementById('kadd-err');
+    if(!name){ err.textContent = 'Geef een naam op.'; return; }
+    const me = getUser(session);
+    const { data, error } = await sb.rpc('fn_create_klant', { p_name: name, p_phone: phone, p_groep: groep, p_created_by: me.name });
+    if(error){ err.textContent = friendlyError(error); return; }
+    closeModal();
+    goTo('/klant/' + data.id);
+    render();
+    showToast(`Klant "${name}" aangemaakt.`);
+  };
+}
+
+// ---------- boss menu ----------
+function bossCodeModal(){
+  showModal(`<div class="modal">
+    <h3>Boss menu</h3>
+    <p class="hint">Voer de bosscode in om het volledige logboek en overzicht per persoon te bekijken.</p>
+    <label>Bosscode</label>
+    <input type="password" inputmode="numeric" id="boss-pin" placeholder="••••" maxlength="16">
+    <div class="err" id="boss-err"></div>
+    <div class="row-btns">
+      <button class="btn secondary" id="boss-cancel" style="flex:1">Annuleren</button>
+      <button class="btn boss" id="boss-ok" style="flex:1">Ontgrendelen</button>
+    </div>
+  </div>`);
+  document.getElementById('boss-cancel').onclick = closeModal;
+  const tryBoss = async () => {
+    const pin = document.getElementById('boss-pin').value.trim();
+    const err = document.getElementById('boss-err');
+    if(!pin){ err.textContent = 'Voer een code in.'; return; }
+    const pinHash = await hashPin(pin);
+    const { data, error } = await sb.rpc('fn_verify_boss', { p_pin_hash: pinHash });
+    if(error || !data){ err.textContent = 'Onjuiste bosscode.'; return; }
+    sessionStorage.setItem(BOSS_KEY, pinHash);
+    closeModal();
+    goTo('/boss');
+    render();
+  };
+  document.getElementById('boss-ok').onclick = tryBoss;
+  document.getElementById('boss-pin').addEventListener('keydown', e => { if(e.key==='Enter') tryBoss(); });
+}
+
+function bossLockedView(){
+  return `
+    ${headerHtml()}
+    <div class="login-shell">
+      <h2>Boss menu</h2>
+      <p class="sub">Dit gedeelte is vergrendeld met een aparte bosscode, los van je persoonlijke profielcode.</p>
+      <button class="btn boss" id="boss-unlock" style="max-width:220px;margin:0 auto;">Code invoeren</button>
+    </div>
+  `;
+}
+function attachBossLockedHandlers(){
+  attachCommonHandlers();
+  document.getElementById('boss-unlock').addEventListener('click', bossCodeModal);
+}
+
+let bossMerged = []; // laatst opgebouwde gefilterde logboek-lijst, voor de filter-dropdown
+
+function bossLogEntriesHtml(list){
+  if(!list.length) return '<div class="empty">Geen registraties.</div>';
+  return list.map(e => `
+    <div class="entry ${e.cls}">
+      <div class="ts">${fmtTs(e.ts)}</div>
+      <div class="desc">${personDot(e.person)}<b>${escapeHtml(e.person)}</b> ${e.label}</div>
+      <div class="delta">${e.delta}</div>
+    </div>
+  `).join('');
+}
+
+function bossView(allLog, allCustLog){
+  // volgorde = cache.users' huidige sortering (sort_order), niet alfabetisch —
+  // zo blijft de sleep-volgorde uit "Overzicht per persoon" behouden.
+  const persons = cache.users.map(u => u.name);
+
+  bossMerged = [
+    ...allLog.map(e => ({
+      ts: e.ts, person: e.user_name, cls: e.type,
+      label: e.type === 'inleg'
+        ? `legde ${e.amount} planten in <span class="sub">totaal ${e.cumulative_after} · zakjes toegekend: ${e.zakjes_after}</span>`
+        : `haalde ${e.amount} zakje${e.amount===1?'':'s'} op <span class="sub">resterend tegoed: ${e.tegoed_after}</span>`,
+      delta: e.type === 'inleg' ? `+${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'}` : `−${e.amount} zakje${e.amount===1?'':'s'}`
+    })),
+    ...allCustLog.map(e => {
+      const klant = getKlant(e.customer_id);
+      return {
+        ts: e.ts, person: e.by_user_name, cls: 'levering',
+        label: `leverde ${e.amount} aan <b>${escapeHtml(klant ? klant.name : 'verwijderde klant')}</b> <span class="sub">totaal klant ${e.cumulative_after} · +${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'} meegekregen</span>`,
+        delta: `+${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'}`
+      };
+    })
+  ].sort((a,b) => new Date(b.ts) - new Date(a.ts));
+
+  const summary = persons.map(name => {
+    const u = cache.users.find(x => x.name === name);
+    const geleverd = allCustLog.filter(e => e.by_user_name === name).reduce((s,e)=>s+e.amount, 0);
+    return {
+      id: u ? u.id : null,
+      name,
+      ingelegd: u ? u.total_ingelegd : 0,
+      opgehaald: u ? u.opgehaald : 0,
+      geleverd
+    };
+  });
+
+  return `
+    ${headerHtml()}
+    <div class="who">
+      <div class="name">Boss menu<span>volledig overzicht van alle ${persons.length} profielen</span></div>
+      <button class="btn secondary" data-boss-lock="1">${ICONS.lock}Vergrendelen</button>
+    </div>
+
+    <div class="section-title"><h2>${ICONS.users}Overzicht per persoon</h2><span>${persons.length} leden — sleep om volgorde aan te passen</span></div>
+    <div class="card" style="padding:14px 20px;">
+      <table>
+        <thead><tr><th></th><th>Naam</th><th class="num">Ingelegd</th><th class="num">Opgehaald</th><th class="num">Geleverd aan klanten</th><th></th></tr></thead>
+        <tbody id="boss-summary-tbody">${summary.map(s => `<tr data-drag-id="${s.id || ''}">
+          <td style="width:1%;">${s.id ? `<span class="drag-handle" data-drag-handle="1" title="Sleep om te herschikken">${ICONS.grip}</span>` : ''}</td>
+          <td>${personDot(s.name)}${escapeHtml(s.name)}</td>
+          <td class="num">${fmtNum(s.ingelegd)}</td>
+          <td class="num">${fmtNum(s.opgehaald)}</td>
+          <td class="num">${fmtNum(s.geleverd)}</td>
+          <td style="text-align:right;white-space:nowrap;">${s.id ? `
+            <button class="btn secondary small" data-reset-pin="${s.id}" data-reset-name="${escapeHtml(s.name)}" style="margin-right:6px;">${ICONS.lock}Code resetten</button>
+            <button class="btn danger small" data-del-profile="${s.id}" data-del-name="${escapeHtml(s.name)}">${ICONS.trash}Verwijderen</button>
+          ` : ''}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+
+    <div class="section-title"><h2>${ICONS.list}Volledig logboek</h2><span>${bossMerged.length} registraties</span></div>
+    <div class="card">
+      <label for="boss-filter">Filter op persoon</label>
+      <select id="boss-filter" class="select-field">
+        <option value="">Iedereen</option>
+        ${persons.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="card" style="padding:6px 20px;margin-top:16px;">
+      <div class="log" id="boss-log">${bossLogEntriesHtml(bossMerged)}</div>
+    </div>
+  `;
+}
+
+async function deleteProfileFromBoss(userId, userName){
+  if(!confirm(`Profiel van "${userName}" verwijderen? Het logboek blijft bewaard (met naam), enkel het inlogprofiel verdwijnt. Dit kan niet ongedaan gemaakt worden.`)) return;
+  const { error } = await sb.rpc('fn_delete_profile', { p_user_id: userId, p_boss_pin_hash: bossPinHash() });
+  if(error){ showToast(friendlyError(error), 'error'); return; }
+  showToast(`Profiel "${userName}" verwijderd.`);
+  render();
+}
+
+async function resetPinFromBoss(userId, userName){
+  if(!confirm(`Code van "${userName}" resetten? Het profiel (met alle geschiedenis) blijft bestaan, maar ${userName} moet opnieuw claimen met een nieuwe zelfgekozen code.`)) return;
+  const { error } = await sb.rpc('fn_boss_reset_pin', { p_user_id: userId, p_boss_pin_hash: bossPinHash() });
+  if(error){ showToast(friendlyError(error), 'error'); return; }
+  showToast(`Code van "${userName}" gereset — kan opnieuw geclaimd worden.`);
+  render();
+}
+
+async function saveBossOrder(ids){
+  const { error } = await sb.rpc('fn_boss_set_order', { p_order: ids, p_boss_pin_hash: bossPinHash() });
+  if(error){ showToast(friendlyError(error), 'error'); render(); return; }
+  showToast('Volgorde opgeslagen.');
+}
+
+function attachBossHandlers(){
+  attachCommonHandlers();
+  const lockBtn = document.querySelector('[data-boss-lock]');
+  if(lockBtn) lockBtn.addEventListener('click', () => {
+    sessionStorage.removeItem(BOSS_KEY);
+    goTo('/');
+    render();
+  });
+  document.querySelectorAll('[data-del-profile]').forEach(el=>{
+    el.addEventListener('click', () => {
+      deleteProfileFromBoss(el.getAttribute('data-del-profile'), el.getAttribute('data-del-name'));
+    });
+  });
+  document.querySelectorAll('[data-reset-pin]').forEach(el=>{
+    el.addEventListener('click', () => {
+      resetPinFromBoss(el.getAttribute('data-reset-pin'), el.getAttribute('data-reset-name'));
+    });
+  });
+  attachRowDrag(document.getElementById('boss-summary-tbody'), saveBossOrder);
+  const filter = document.getElementById('boss-filter');
+  if(filter){
+    filter.addEventListener('change', () => {
+      const val = filter.value;
+      const filtered = val ? bossMerged.filter(e => e.person === val) : bossMerged;
+      document.getElementById('boss-log').innerHTML = bossLogEntriesHtml(filtered);
+    });
+  }
+}
+
+// ---------- event wiring: login screen ----------
+function attachLoginHandlers(){
+  attachCommonHandlers();
+  document.querySelectorAll('[data-select]').forEach(el => {
+    el.addEventListener('click', () => {
+      const u = getUser(el.getAttribute('data-select'));
+      if(!u) return;
+      if(u.claimed) loginModal(u); else claimModal(u);
+    });
+  });
+  const addTile = document.querySelector('[data-add]');
+  if(addTile) addTile.addEventListener('click', addProfileModal);
+}
+
+// ---------- event wiring: common (nav + logout) ----------
+function attachCommonHandlers(){
+  document.querySelectorAll('[data-nav]').forEach(el=>{
+    el.addEventListener('click', ()=> goTo(el.getAttribute('data-nav')));
+  });
+  document.querySelectorAll('[data-goto]').forEach(el=>{
+    el.addEventListener('click', ()=> goTo(el.getAttribute('data-goto')));
+  });
+  document.querySelectorAll('[data-boss]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      closeMobileMenu();
+      if(isBossUnlocked()){ goTo('/boss'); render(); } else { bossCodeModal(); }
+    });
+  });
+  document.querySelectorAll('[data-edit-avatar]').forEach(el=>{
+    el.addEventListener('click', () => {
+      closeMobileMenu();
+      const me = getUser(session);
+      if(me) profileSettingsModal(me);
+    });
+  });
+  document.querySelectorAll('[data-logout]').forEach(el=>{
+    el.addEventListener('click', () => {
+      closeMobileMenu();
+      session = null;
+      localStorage.removeItem(SESSION_KEY);
+      goTo('/');
+      render();
+    });
+  });
+  const menuToggle = document.getElementById('menu-toggle');
+  if(menuToggle) menuToggle.addEventListener('click', openMobileMenu);
+}
+
+// ---------- event wiring: loods dashboard ----------
+function attachDashboardHandlers(){
+  attachCommonHandlers();
+  startQueueTicker();
+
+  const inAmount = document.getElementById('in-amount');
+  if(inAmount){
+    const preview = document.getElementById('in-preview');
+    inAmount.addEventListener('input', () => {
+      const v = parseInt(inAmount.value, 10);
+      if(!v || v <= 0){ preview.innerHTML=''; return; }
+      const me = getUser(session);
+      const newTotal = me.total_ingelegd + v;
+      const newZakjes = zakjesVoor(newTotal);
+      const delta = newZakjes - zakjesVoor(me.total_ingelegd);
+      preview.innerHTML = `Nieuw totaal: <b>${newTotal}</b> planten → jij krijgt er <b>+${delta}</b> zakje${delta===1?'':'s'} bij.`;
+    });
+    document.getElementById('in-submit').addEventListener('click', async () => {
+      const v = parseInt(inAmount.value, 10);
+      const err = document.getElementById('in-err');
+      if(!v || v <= 0){ err.textContent = 'Voer een geldig aantal planten in.'; return; }
+      const { error } = await sb.rpc('fn_register_inleg', { p_user_id: session, p_amount: v });
+      if(error){ err.textContent = friendlyError(error); return; }
+      showToast(`Inleg geregistreerd: +${v} planten.`);
+      render();
+    });
+  }
+
+  const outAmount = document.getElementById('out-amount');
+  if(outAmount){
+    document.getElementById('out-submit').addEventListener('click', async () => {
+      const v = parseInt(outAmount.value, 10);
+      const err = document.getElementById('out-err');
+      if(!v || v <= 0){ err.textContent = 'Voer een geldig aantal zakjes in.'; return; }
+      const { error } = await sb.rpc('fn_register_ophalen', { p_user_id: session, p_amount: v });
+      if(error){ err.textContent = friendlyError(error); return; }
+      showToast(`Opgehaald: ${v} zakje${v===1?'':'s'}.`);
+      render();
+    });
+  }
+}
+
+// ---------- event wiring: klanten list ----------
+function attachKlantenListHandlers(){
+  attachCommonHandlers();
+  document.getElementById('klant-add').addEventListener('click', addKlantModal);
+
+  document.querySelectorAll('[data-goto-klant]').forEach(el=>{
+    el.addEventListener('click', ()=> goTo('/klant/' + el.getAttribute('data-goto-klant')));
+  });
+
+  const search = document.getElementById('klant-search');
+  search.addEventListener('input', () => {
+    const q = search.value.trim().toLowerCase();
+    const rows = [...cache.customers].sort((a,b)=>a.name.localeCompare(b.name)).filter(c =>
+      c.name.toLowerCase().includes(q) || (c.groep||'').toLowerCase().includes(q)
+    ).map(c => {
+      const z = zakjesVoorKlant(c.total_geleverd);
+      return `<tr class="clickable" data-goto-klant="${c.id}">
+        <td>${escapeHtml(c.name)}</td>
+        <td>${c.groep ? `<span class="pill">${escapeHtml(c.groep)}</span>` : ''}</td>
+        <td class="num">${fmtNum(c.total_geleverd)}</td>
+        <td class="num tegoed">${fmtNum(z)}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('klant-tbody').innerHTML = rows;
+    document.querySelectorAll('[data-goto-klant]').forEach(el=>{
+      el.addEventListener('click', ()=> goTo('/klant/' + el.getAttribute('data-goto-klant')));
+    });
+  });
+}
+
+// ---------- event wiring: klant detail ----------
+function attachKlantDetailHandlers(k){
+  attachCommonHandlers();
+
+  const klAmount = document.getElementById('kl-amount');
+  const preview = document.getElementById('kl-preview');
+  klAmount.addEventListener('input', () => {
+    const v = parseInt(klAmount.value, 10);
+    if(!v || v <= 0){ preview.innerHTML=''; return; }
+    const newTotal = k.total_geleverd + v;
+    const newZakjes = zakjesVoorKlant(newTotal);
+    const delta = newZakjes - zakjesVoorKlant(k.total_geleverd);
+    preview.innerHTML = `Nieuw totaal: <b>${newTotal}</b> → er komt <b>+${delta}</b> zakje${delta===1?'':'s'} bij.`;
+  });
+  document.getElementById('kl-submit').addEventListener('click', async () => {
+    const v = parseInt(klAmount.value, 10);
+    const err = document.getElementById('kl-err');
+    if(!v || v <= 0){ err.textContent = 'Voer een geldig aantal in.'; return; }
+    const me = getUser(session);
+    const { error } = await sb.rpc('fn_register_levering', { p_customer_id: k.id, p_amount: v, p_by_user_id: me.id, p_by_user_name: me.name });
+    if(error){ err.textContent = friendlyError(error); return; }
+    showToast(`Levering geregistreerd voor ${k.name}.`);
+    render();
+  });
+}
+
+boot();
+</script>
+</body>
+</html>
