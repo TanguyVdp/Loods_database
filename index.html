@@ -364,7 +364,13 @@ function personIndex(name){
   for(let i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i)) >>> 0;
   return h % 500 + 500;
 }
+// Handmatige uitzonderingen op de automatische kleurtoewijzing (naam in kleine letters).
+const PERSON_COLOR_OVERRIDES = {
+  bob: '#B8202B' // donker fel rood
+};
 function personColor(name){
+  const override = PERSON_COLOR_OVERRIDES[name.trim().toLowerCase()];
+  if(override) return override;
   const hue = (personIndex(name) * GOLDEN_ANGLE) % 360;
   return hslToHex(hue, 68, 62);
 }
