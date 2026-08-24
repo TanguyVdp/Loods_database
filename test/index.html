@@ -427,8 +427,12 @@ function addMinutesSkippingBlackout(startDate, minutes){
   return current;
 }
 
-function computeQueueTimeline(log){
-  const entries = log.filter(e => e.type === 'inleg' && e.zakjes_delta > 0)
+function computeQueueTimeline(log, sinceTs){
+  // sinceTs = laatste kalibratiepunt: alles ervoor telt al mee in de baseline-
+  // waarde, dus enkel wat daarna ingelegd is nog simuleren (voorkomt dat de
+  // wachtrij een steeds groter wordende, onrealistische achterstand opbouwt)
+  const cutoff = sinceTs ? new Date(sinceTs) : null;
+  const entries = log.filter(e => e.type === 'inleg' && e.zakjes_delta > 0 && (!cutoff || new Date(e.ts) > cutoff))
     .slice().sort((a,b) => new Date(a.ts) - new Date(b.ts));
   let freeAt = null;
   return entries.map(e => {
@@ -437,35 +441,48 @@ function computeQueueTimeline(log){
     const minutes = e.zakjes_delta * PROCESSING_MINUTES_PER_ZAKJE;
     const end = addMinutesSkippingBlackout(start, minutes);
     freeAt = end;
-    return { userName: e.user_name, zakjes: e.zakjes_delta, start, end, minutes };
+    return { userName: e.user_name, zakjes: e.zakjes_delta, amount: e.amount, start, end, minutes };
   });
 }
 
 let lastQueueTimeline = [];
-let lastTotalIngelegd = 0;
+let lastBaseline = { value: 0, set_at: new Date(0).toISOString(), set_by: null };
 let queueTickInterval = null;
 
-// hoeveel planten zijn er (volgens de wachtrij) al effectief verwerkt en dus
-// niet meer fysiek in de loods, ongeacht wie ze inlegde
-function plantenNogInLoods(timeline, totalIngelegd){
+async function fetchLoodsBaseline(){
+  const { data, error } = await sb.from('loods_baseline').select('*').eq('id', true).maybeSingle();
+  if(error || !data) return { value: 0, set_at: new Date(0).toISOString(), set_by: null };
+  return data;
+}
+
+// planten die volgens het kalibratiepunt + de wachtrij nu nog fysiek in de loods liggen
+function plantenNogInLoods(timeline, baseline){
   const now = new Date();
+  const nieuwIngelegd = timeline.reduce((s,t) => s + t.amount, 0);
   const verwerkteZakjes = timeline.filter(t => t.end <= now).reduce((s,t) => s + t.zakjes, 0);
-  return Math.max(0, totalIngelegd - verwerkteZakjes * RATIO_IN);
+  return Math.max(0, baseline.value + nieuwIngelegd - verwerkteZakjes * RATIO_IN);
 }
 function updateLoodsStatTile(){
   const el = document.getElementById('stat-planten-loods');
-  if(el) el.textContent = fmtNum(plantenNogInLoods(lastQueueTimeline, lastTotalIngelegd));
+  if(el) el.textContent = fmtNum(plantenNogInLoods(lastQueueTimeline, lastBaseline));
 }
 
-function queueWidgetHtml(timeline){
+function queueWidgetHtml(timeline, baseline){
   const now = new Date();
   const active = timeline.filter(t => t.end > now);
+  const calibrateRow = `
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <span style="font-size:11px;color:var(--muted);">Kalibratiepunt: <b class="mono" style="color:var(--cream)">${fmtNum(baseline.value)}</b>${baseline.set_by ? ` · gezet door ${escapeHtml(baseline.set_by)} om ${fmtClock(new Date(baseline.set_at))}` : ' · nog niet ingesteld'}</span>
+      <input type="number" id="baseline-input" min="0" placeholder="werkelijke voorraad nu" style="max-width:170px;background:rgba(255,255,255,0.035);border:1px solid var(--border);border-radius:7px;color:var(--cream);padding:6px 9px;font-family:'Space Mono',monospace;font-size:13px;">
+      <button class="btn secondary small" id="baseline-save">Kalibreren</button>
+    </div>`;
 
   if(active.length === 0){
     return `<div class="card" id="queue-widget" style="margin-bottom:20px;">
       <h2>${ICONS.clock}Verwerkingswachtrij <span class="pill" style="margin-left:6px;">TEST</span></h2>
       <p class="hint">Eerlijk op volgorde van inleg (FIFO) — ${PROCESSING_MINUTES_PER_ZAKJE} min per zakje. Er wordt niet geteld tijdens server-restarts (7u55-8u10, 11u55-12u10, 17u55-18u10).</p>
       <div class="empty">Wachtrij is momenteel leeg.</div>
+      ${calibrateRow}
     </div>`;
   }
 
@@ -488,14 +505,29 @@ function queueWidgetHtml(timeline){
     <h2>${ICONS.clock}Verwerkingswachtrij <span class="pill" style="margin-left:6px;">TEST</span></h2>
     <p class="hint">Eerlijk op volgorde van inleg (FIFO) — ${PROCESSING_MINUTES_PER_ZAKJE} min per zakje. Er wordt niet geteld tijdens server-restarts (7u55-8u10, 11u55-12u10, 17u55-18u10).</p>
     <div class="log">${rows}</div>
+    ${calibrateRow}
   </div>`;
+}
+function attachQueueWidgetHandlers(){
+  const baselineBtn = document.getElementById('baseline-save');
+  if(baselineBtn) baselineBtn.addEventListener('click', async () => {
+    const input = document.getElementById('baseline-input');
+    const val = parseInt(input.value, 10);
+    if(isNaN(val) || val < 0){ showToast('Voer een geldig aantal in.', 'error'); return; }
+    const me = getUser(session);
+    const { error } = await sb.rpc('fn_set_loods_baseline', { p_value: val, p_set_by: me ? me.name : '?' });
+    if(error){ showToast(friendlyError(error), 'error'); return; }
+    showToast('Voorraad gekalibreerd.');
+    render();
+  });
 }
 function startQueueTicker(){
   if(queueTickInterval) clearInterval(queueTickInterval);
   queueTickInterval = setInterval(() => {
     const el = document.getElementById('queue-widget');
     if(!el){ clearInterval(queueTickInterval); return; }
-    el.outerHTML = queueWidgetHtml(lastQueueTimeline);
+    el.outerHTML = queueWidgetHtml(lastQueueTimeline, lastBaseline);
+    attachQueueWidgetHandlers();
     updateLoodsStatTile();
   }, 20000);
 }
@@ -809,9 +841,10 @@ async function render(overrideHtml){
     mount(klantDetailView(k, klantLog), () => attachKlantDetailHandlers(k));
   } else {
     cache.log = await fetchLoodsLog();
-    const allInlegLog = await fetchAllLoodsLog(); // TEST: volledige historiek voor de wachtrij-berekening
+    const allInlegLog = await fetchAllLoodsLog(); // TEST: historiek sinds kalibratiepunt, voor de wachtrij-berekening
+    const baseline = await fetchLoodsBaseline(); // TEST
     if(mySeq !== renderSeq) return;
-    mount(dashboardView(allInlegLog), attachDashboardHandlers);
+    mount(dashboardView(allInlegLog, baseline), attachDashboardHandlers);
   }
 }
 
@@ -899,7 +932,7 @@ function loginView(){
 }
 
 // ---------- DASHBOARD VIEW (loods) ----------
-function dashboardView(allInlegLog){
+function dashboardView(allInlegLog, baseline){
   const me = getUser(session);
   const totalIngelegd = cache.users.reduce((s,u)=>s+u.total_ingelegd,0);
   const totalZakjesToegekend = cache.users.reduce((s,u)=>s+zakjesVoor(u.total_ingelegd),0);
@@ -907,9 +940,9 @@ function dashboardView(allInlegLog){
   const myZakjes = zakjesVoor(me.total_ingelegd);
   const myTegoed = myZakjes - me.opgehaald;
 
-  const queueTimeline = computeQueueTimeline(allInlegLog);
+  const queueTimeline = computeQueueTimeline(allInlegLog, baseline.set_at);
   lastQueueTimeline = queueTimeline;
-  lastTotalIngelegd = totalIngelegd;
+  lastBaseline = baseline;
 
   const rows = [...cache.users].sort((a,b)=> (zakjesVoor(b.total_ingelegd)-b.opgehaald) - (zakjesVoor(a.total_ingelegd)-a.opgehaald))
     .map(u => {
@@ -953,7 +986,7 @@ function dashboardView(allInlegLog){
     </div>
 
     <div class="totals" style="margin-bottom:22px;">
-      <div class="t"><div class="n" id="stat-planten-loods">${fmtNum(plantenNogInLoods(queueTimeline, totalIngelegd))}</div><div class="l">planten in loods</div></div>
+      <div class="t"><div class="n" id="stat-planten-loods">${fmtNum(plantenNogInLoods(queueTimeline, baseline))}</div><div class="l">planten in loods</div></div>
       <div class="t"><div class="n">${fmtNum(totalZakjesToegekend)}</div><div class="l">zakjes toegekend</div></div>
       <div class="t"><div class="n">${fmtNum(totalOpgehaald)}</div><div class="l">al opgehaald</div></div>
       <div class="t"><div class="n tegoed">${fmtNum(totalZakjesToegekend - totalOpgehaald)}</div><div class="l">nog tegoed</div></div>
@@ -964,7 +997,7 @@ function dashboardView(allInlegLog){
       <div class="progress-label"><b>${totalOpgehaald}</b> van <b>${totalZakjesToegekend}</b> toegekende zakjes al opgehaald (${totalZakjesToegekend>0 ? Math.round(totalOpgehaald/totalZakjesToegekend*100) : 0}%)</div>
     </div>
 
-    ${queueWidgetHtml(queueTimeline)}
+    ${queueWidgetHtml(queueTimeline, baseline)}
 
     <div class="grid2">
       <div class="card">
@@ -1556,6 +1589,7 @@ function attachCommonHandlers(){
 // ---------- event wiring: loods dashboard ----------
 function attachDashboardHandlers(){
   attachCommonHandlers();
+  attachQueueWidgetHandlers();
   startQueueTicker();
 
   const inAmount = document.getElementById('in-amount');
