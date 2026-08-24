@@ -371,6 +371,7 @@ function fmtTs(ts){
          d.toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'});
 }
 function fmtClock(d){ return d.toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'}); }
+function fmtDate(d){ return d.toLocaleDateString('nl-BE',{day:'2-digit',month:'2-digit'}); }
 
 // ---------- TEST: verwerkingswachtrij (FIFO, eerst ingelegd = eerst verwerkt) ----------
 // Puur berekend uit bestaande 'inleg'-registraties (tijdstip + zakjes), schrijft niets weg.
@@ -411,7 +412,7 @@ function queueWidgetHtml(allLog){
       ? `wordt verwerkt · nog ${remainingMin} min`
       : `wacht op zijn beurt · start om ${fmtClock(t.start)}`;
     return `<div class="entry ${processing ? 'inleg' : ''}">
-      <div class="ts">${fmtClock(t.start)}–${fmtClock(t.end)}</div>
+      <div class="ts">${fmtDate(t.start)} | ${fmtClock(t.start)} - ${fmtClock(t.end)}</div>
       <div class="desc">${personDot(t.userName)}<b>${escapeHtml(t.userName)}</b> — ${t.zakjes} zakje${t.zakjes===1?'':'s'}
         <span class="sub">${statusText}</span>
       </div>
