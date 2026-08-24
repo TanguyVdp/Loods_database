@@ -164,7 +164,8 @@ button{cursor:pointer;font-family:'Inter',sans-serif;touch-action:manipulation;}
   backdrop-filter:blur(16px);transition:border-color .2s, background .2s;
   max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .card:hover{border-color:var(--border-hi);}
-.card h2{font-size:15px;margin:0 0 5px;font-weight:600;}
+.card h2{display:flex;align-items:center;gap:8px;font-size:15px;margin:0 0 5px;font-weight:600;}
+.card h2 svg{color:var(--lime);flex-shrink:0;}
 .card p.hint{color:var(--muted);font-size:12.5px;margin:0 0 16px;line-height:1.55;}
 .card label{display:block;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:7px;font-weight:600;}
 .card input[type=number],.card input[type=text],.card input[type=tel]{width:100%;background:rgba(255,255,255,0.04);
@@ -191,7 +192,8 @@ tr.clickable:hover td{background:rgba(255,255,255,0.03);}
   font-size:10px;padding:3px 9px;border-radius:20px;letter-spacing:0.03em;font-weight:600;}
 
 .section-title{display:flex;align-items:baseline;justify-content:space-between;margin:34px 0 12px;flex-wrap:wrap;gap:8px;}
-.section-title h2{font-size:15.5px;margin:0;font-weight:600;}
+.section-title h2{display:flex;align-items:center;gap:8px;font-size:15.5px;margin:0;font-weight:600;}
+.section-title h2 svg{color:var(--muted);flex-shrink:0;}
 .section-title span{font-size:11.5px;color:var(--muted);font-family:'Space Mono',monospace;}
 
 .log{display:flex;flex-direction:column;gap:0;}
@@ -244,6 +246,13 @@ footer.note{margin-top:38px;color:var(--muted);font-size:11.5px;line-height:1.65
 
 /* ---------- person color dot ---------- */
 .p-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;flex-shrink:0;vertical-align:middle;}
+
+/* ---------- progress bar ---------- */
+.progress-wrap{margin-bottom:22px;}
+.progress-bar{height:8px;border-radius:999px;background:rgba(255,255,255,0.06);overflow:hidden;}
+.progress-fill{height:100%;background:var(--grad-a);border-radius:999px;transition:width .6s cubic-bezier(.16,1,.3,1);}
+.progress-label{margin-top:8px;font-size:11.5px;color:var(--muted);}
+.progress-label b{color:var(--cream);font-family:'Space Mono',monospace;font-weight:700;}
 </style>
 </head>
 <body>
@@ -316,8 +325,13 @@ const ICONS = {
   users: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.5 2.9-6 6.5-6s6.5 2.5 6.5 6"/><circle cx="17.5" cy="9" r="2.6"/><path d="M15.2 14.3c2.6.4 4.3 2.4 4.3 5.7"/></svg>`,
   shield: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/></svg>`,
   lock: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>`,
-  trash: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>`
+  trash: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>`,
+  sprout: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-9"/><path d="M12 13c0-4 3-6 7-6 0 4-3 7-7 7"/><path d="M12 13c0-3-2.5-5-6-5 0 3.5 2.5 6 6 6"/></svg>`,
+  arrowDown: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16"/><path d="M6 14l6 6 6-6"/></svg>`,
+  truck: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="7" width="13" height="10"/><path d="M14 10h4l4 4v3h-8"/><circle cx="5.5" cy="19" r="1.7"/><circle cx="17.5" cy="19" r="1.7"/></svg>`,
+  list: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="3.5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="3.5" cy="18" r="1.4" fill="currentColor" stroke="none"/></svg>`
 };
+function fmtNum(n){ return Number(n).toLocaleString('nl-BE'); }
 
 // ---------- unieke kleur per persoon (herkenbaar in avatars/tabellen/log) ----------
 const PERSON_PALETTE = [
@@ -563,10 +577,10 @@ function dashboardView(){
       const tegoed = z - u.opgehaald;
       return `<tr class="${u.id===me.id?'me':''}">
         <td>${personDot(u.name)}${escapeHtml(u.name)}</td>
-        <td class="num">${u.total_ingelegd}</td>
-        <td class="num">${z}</td>
-        <td class="num">${u.opgehaald}</td>
-        <td class="num tegoed">${tegoed}</td>
+        <td class="num">${fmtNum(u.total_ingelegd)}</td>
+        <td class="num">${fmtNum(z)}</td>
+        <td class="num">${fmtNum(u.opgehaald)}</td>
+        <td class="num tegoed">${fmtNum(tegoed)}</td>
       </tr>`;
     }).join('');
 
@@ -599,15 +613,20 @@ function dashboardView(){
     </div>
 
     <div class="totals" style="margin-bottom:22px;">
-      <div class="t"><div class="n">${totalIngelegd}</div><div class="l">planten in loods</div></div>
-      <div class="t"><div class="n">${totalZakjesToegekend}</div><div class="l">zakjes toegekend</div></div>
-      <div class="t"><div class="n">${totalOpgehaald}</div><div class="l">al opgehaald</div></div>
-      <div class="t"><div class="n tegoed">${totalZakjesToegekend - totalOpgehaald}</div><div class="l">nog tegoed</div></div>
+      <div class="t"><div class="n">${fmtNum(totalIngelegd)}</div><div class="l">planten in loods</div></div>
+      <div class="t"><div class="n">${fmtNum(totalZakjesToegekend)}</div><div class="l">zakjes toegekend</div></div>
+      <div class="t"><div class="n">${fmtNum(totalOpgehaald)}</div><div class="l">al opgehaald</div></div>
+      <div class="t"><div class="n tegoed">${fmtNum(totalZakjesToegekend - totalOpgehaald)}</div><div class="l">nog tegoed</div></div>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" style="width:${totalZakjesToegekend>0 ? Math.min(100, Math.round(totalOpgehaald/totalZakjesToegekend*100)) : 0}%"></div></div>
+      <div class="progress-label"><b>${totalOpgehaald}</b> van <b>${totalZakjesToegekend}</b> toegekende zakjes al opgehaald (${totalZakjesToegekend>0 ? Math.round(totalOpgehaald/totalZakjesToegekend*100) : 0}%)</div>
     </div>
 
     <div class="grid2">
       <div class="card">
-        <h2>Planten inleggen</h2>
+        <h2>${ICONS.sprout}Planten inleggen</h2>
         <p class="hint">Geef door hoeveel planten je in de loods hebt gelegd. Wordt meteen opgeteld bij het totaal (${me.total_ingelegd} nu) en omgerekend: elke ${RATIO_IN} planten leveren ${RATIO_OUT} zakje op.</p>
         <label for="in-amount">Aantal planten</label>
         <input type="number" id="in-amount" min="1" step="1" placeholder="bv. 120">
@@ -617,7 +636,7 @@ function dashboardView(){
       </div>
 
       <div class="card">
-        <h2>Zakjes ophalen</h2>
+        <h2>${ICONS.arrowDown}Zakjes ophalen</h2>
         <p class="hint">Je hebt nu <b class="mono" style="color:var(--lime)">${myTegoed}</b> zakje${myTegoed===1?'':'s'} tegoed. Registreer hier hoeveel je meeneemt zodat iedereen kan zien wat er nog in de loods ligt.</p>
         <label for="out-amount">Aantal zakjes ophalen</label>
         <input type="number" id="out-amount" min="1" step="1" max="${myTegoed}" placeholder="bv. 20" ${myTegoed<=0?'disabled':''}>
@@ -626,7 +645,7 @@ function dashboardView(){
       </div>
     </div>
 
-    <div class="section-title"><h2>Overzicht per profiel</h2><span>${cache.users.length}/${MAX_USERS} profielen</span></div>
+    <div class="section-title"><h2>${ICONS.users}Overzicht per profiel</h2><span>${cache.users.length}/${MAX_USERS} profielen</span></div>
     <div class="card" style="padding:14px 20px;">
       <table>
         <thead><tr><th>Naam</th><th class="num">Ingelegd</th><th class="num">Zakjes</th><th class="num">Opgehaald</th><th class="num">Tegoed</th></tr></thead>
@@ -634,7 +653,7 @@ function dashboardView(){
       </table>
     </div>
 
-    <div class="section-title"><h2>Volledig logboek</h2><span>laatste ${cache.log.length} registraties</span></div>
+    <div class="section-title"><h2>${ICONS.list}Volledig logboek</h2><span>laatste ${cache.log.length} registraties</span></div>
     <div class="card" style="padding:6px 20px;">
       <div class="log">${logEntries || '<div class="empty">Nog geen registraties.</div>'}</div>
     </div>
@@ -658,8 +677,8 @@ function klantenListView(){
     return `<tr class="clickable" data-goto-klant="${c.id}">
       <td>${escapeHtml(c.name)}</td>
       <td>${c.groep ? `<span class="pill">${escapeHtml(c.groep)}</span>` : ''}</td>
-      <td class="num">${c.total_geleverd}</td>
-      <td class="num tegoed">${z}</td>
+      <td class="num">${fmtNum(c.total_geleverd)}</td>
+      <td class="num tegoed">${fmtNum(z)}</td>
     </tr>`;
   }).join('');
 
@@ -673,12 +692,12 @@ function klantenListView(){
     </div>
 
     <div class="totals" style="margin-bottom:22px;">
-      <div class="t"><div class="n">${cache.customers.length}</div><div class="l">klanten</div></div>
-      <div class="t"><div class="n">${totalGeleverd}</div><div class="l">totaal geleverd</div></div>
-      <div class="t"><div class="n">${totalZakjes}</div><div class="l">zakjes meegekregen</div></div>
+      <div class="t"><div class="n">${fmtNum(cache.customers.length)}</div><div class="l">klanten</div></div>
+      <div class="t"><div class="n">${fmtNum(totalGeleverd)}</div><div class="l">totaal geleverd</div></div>
+      <div class="t"><div class="n">${fmtNum(totalZakjes)}</div><div class="l">zakjes meegekregen</div></div>
     </div>
 
-    <div class="section-title"><h2>Klantenbestand</h2><span>omrekening: ${KLANT_RATIO_IN}:${KLANT_RATIO_OUT}</span></div>
+    <div class="section-title"><h2>${ICONS.users}Klantenbestand</h2><span>omrekening: ${KLANT_RATIO_IN}:${KLANT_RATIO_OUT}</span></div>
     <div class="card">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
         <input type="text" class="klant-search" id="klant-search" placeholder="Zoek op naam of groep…" style="flex:1;min-width:180px;">
@@ -725,13 +744,13 @@ function klantDetailView(k, klantLog){
         </div>
       </div>
       <div class="totals">
-        <div class="t"><div class="n">${k.total_geleverd}</div><div class="l">geleverd</div></div>
-        <div class="t"><div class="n tegoed">${z}</div><div class="l">zakjes meegekregen</div></div>
+        <div class="t"><div class="n">${fmtNum(k.total_geleverd)}</div><div class="l">geleverd</div></div>
+        <div class="t"><div class="n tegoed">${fmtNum(z)}</div><div class="l">zakjes meegekregen</div></div>
       </div>
     </div>
 
     <div class="card">
-      <h2>Levering registreren</h2>
+      <h2><span style="color:var(--violet);display:inline-flex;">${ICONS.truck}</span>Levering registreren</h2>
       <p class="hint">Vul in hoeveel ${escapeHtml(k.name)} geleverd heeft. Wordt opgeteld bij het totaal (${k.total_geleverd} nu). Bij klanten geldt: elke ${KLANT_RATIO_IN} geleverd = ${KLANT_RATIO_OUT} zakje, en die krijgen ze er meteen bij mee — er wordt dus niets tegoed gehouden.</p>
       <label for="kl-amount">Aantal geleverd</label>
       <input type="number" id="kl-amount" min="1" step="1" placeholder="bv. 40">
@@ -740,7 +759,7 @@ function klantDetailView(k, klantLog){
       <div class="err" id="kl-err"></div>
     </div>
 
-    <div class="section-title"><h2>Geschiedenis van ${escapeHtml(k.name)}</h2><span>${klantLog.length} registraties</span></div>
+    <div class="section-title"><h2>${ICONS.list}Geschiedenis van ${escapeHtml(k.name)}</h2><span>${klantLog.length} registraties</span></div>
     <div class="card" style="padding:6px 20px;">
       <div class="log">${entries || '<div class="empty">Nog geen registraties voor deze klant.</div>'}</div>
     </div>
@@ -875,6 +894,7 @@ function addKlantModal(){
     closeModal();
     goTo('/klant/' + data.id);
     render();
+    showToast(`Klant "${name}" aangemaakt.`);
   };
 }
 
@@ -976,21 +996,21 @@ function bossView(allLog, allCustLog){
       <button class="btn secondary" data-boss-lock="1">${ICONS.lock}Vergrendelen</button>
     </div>
 
-    <div class="section-title"><h2>Overzicht per persoon</h2><span>${persons.length} leden</span></div>
+    <div class="section-title"><h2>${ICONS.users}Overzicht per persoon</h2><span>${persons.length} leden</span></div>
     <div class="card" style="padding:14px 20px;">
       <table>
         <thead><tr><th>Naam</th><th class="num">Ingelegd</th><th class="num">Opgehaald</th><th class="num">Geleverd aan klanten</th><th></th></tr></thead>
         <tbody>${summary.map(s => `<tr>
           <td>${personDot(s.name)}${escapeHtml(s.name)}</td>
-          <td class="num">${s.ingelegd}</td>
-          <td class="num">${s.opgehaald}</td>
-          <td class="num">${s.geleverd}</td>
+          <td class="num">${fmtNum(s.ingelegd)}</td>
+          <td class="num">${fmtNum(s.opgehaald)}</td>
+          <td class="num">${fmtNum(s.geleverd)}</td>
           <td style="text-align:right;">${s.id ? `<button class="btn danger small" data-del-profile="${s.id}" data-del-name="${escapeHtml(s.name)}">${ICONS.trash}Verwijderen</button>` : ''}</td>
         </tr>`).join('')}</tbody>
       </table>
     </div>
 
-    <div class="section-title"><h2>Volledig logboek</h2><span>${bossMerged.length} registraties</span></div>
+    <div class="section-title"><h2>${ICONS.list}Volledig logboek</h2><span>${bossMerged.length} registraties</span></div>
     <div class="card">
       <label for="boss-filter">Filter op persoon</label>
       <select id="boss-filter" class="select-field">
@@ -1093,6 +1113,7 @@ function attachDashboardHandlers(){
       if(!v || v <= 0){ err.textContent = 'Voer een geldig aantal planten in.'; return; }
       const { error } = await sb.rpc('fn_register_inleg', { p_user_id: session, p_amount: v });
       if(error){ err.textContent = friendlyError(error); return; }
+      showToast(`Inleg geregistreerd: +${v} planten.`);
       render();
     });
   }
@@ -1105,6 +1126,7 @@ function attachDashboardHandlers(){
       if(!v || v <= 0){ err.textContent = 'Voer een geldig aantal zakjes in.'; return; }
       const { error } = await sb.rpc('fn_register_ophalen', { p_user_id: session, p_amount: v });
       if(error){ err.textContent = friendlyError(error); return; }
+      showToast(`Opgehaald: ${v} zakje${v===1?'':'s'}.`);
       render();
     });
   }
@@ -1129,8 +1151,8 @@ function attachKlantenListHandlers(){
       return `<tr class="clickable" data-goto-klant="${c.id}">
         <td>${escapeHtml(c.name)}</td>
         <td>${c.groep ? `<span class="pill">${escapeHtml(c.groep)}</span>` : ''}</td>
-        <td class="num">${c.total_geleverd}</td>
-        <td class="num tegoed">${z}</td>
+        <td class="num">${fmtNum(c.total_geleverd)}</td>
+        <td class="num tegoed">${fmtNum(z)}</td>
       </tr>`;
     }).join('');
     document.getElementById('klant-tbody').innerHTML = rows;
@@ -1161,6 +1183,7 @@ function attachKlantDetailHandlers(k){
     const me = getUser(session);
     const { error } = await sb.rpc('fn_register_levering', { p_customer_id: k.id, p_amount: v, p_by_user_id: me.id, p_by_user_name: me.name });
     if(error){ err.textContent = friendlyError(error); return; }
+    showToast(`Levering geregistreerd voor ${k.name}.`);
     render();
   });
 }
