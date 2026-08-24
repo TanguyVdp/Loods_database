@@ -263,10 +263,42 @@ footer.note{margin-top:36px;color:var(--muted-dim);font-size:11px;line-height:1.
 .progress-fill{height:100%;background:var(--grad-a);border-radius:999px;transition:width .6s var(--ease);}
 .progress-label{margin-top:8px;font-size:11px;color:var(--muted);}
 .progress-label b{color:var(--cream);font-family:'Space Mono',monospace;font-weight:700;}
+
+/* ---------- sidebar (desktop app shell) ---------- */
+#sidebar{display:none;}
+@media(min-width:880px){
+  #sidebar{
+    display:flex;flex-direction:column;
+    position:fixed;top:0;left:0;bottom:0;width:216px;
+    padding:22px 14px;border-right:1px solid var(--border);background:var(--bg);
+    z-index:30;overflow-y:auto;
+  }
+  header.top,.navtabs{display:none;}
+  .wrap{margin:0 0 0 216px;max-width:900px;padding:36px 32px 64px;}
+  .who-avatar-btn,.who-logout{display:none;}
+}
+.sidebar-brand{display:flex;align-items:center;gap:10px;padding:2px 8px 18px;margin-bottom:8px;border-bottom:1px solid var(--border);}
+.sidebar-brand h1{font-size:14.5px;margin:0;color:var(--cream);font-weight:700;letter-spacing:-0.01em;}
+.sidebar-brand p{margin:1px 0 0;font-size:10px;color:var(--muted);}
+.sidebar-nav{display:flex;flex-direction:column;gap:1px;}
+.sidebar-link{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;color:var(--muted);
+  text-decoration:none;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .12s,color .12s;}
+.sidebar-link svg{flex-shrink:0;}
+.sidebar-link:hover{background:var(--surface);color:var(--cream);}
+.sidebar-link.active{background:var(--surface-hi);color:var(--cream);}
+.sidebar-link.active svg{color:var(--lime);}
+.sidebar-link .count{margin-left:auto;font-size:10px;color:var(--muted-dim);font-family:'Space Mono',monospace;}
+.sidebar-spacer{flex:1;}
+.sidebar-footer{border-top:1px solid var(--border);padding-top:12px;margin-top:12px;display:flex;flex-direction:column;gap:6px;}
+.sidebar-footer .syncdot{padding:0 7px;margin-bottom:2px;}
+.sidebar-user{display:flex;align-items:center;gap:9px;background:none;border:none;padding:6px 7px;border-radius:6px;cursor:pointer;text-align:left;width:100%;}
+.sidebar-user:hover{background:var(--surface);}
+.sidebar-user span{font-size:12px;font-weight:600;color:var(--cream);text-transform:capitalize;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 </style>
 </head>
 <body>
 <div id="loading-bar"></div>
+<aside id="sidebar"></aside>
 <div class="wrap" id="app"></div>
 <div id="modal-root"></div>
 <div id="toast-root"></div>
@@ -530,6 +562,7 @@ async function render(overrideHtml){
   if(typeof overrideHtml === 'string'){ app.innerHTML = overrideHtml; return; }
 
   function mount(html, attachFn){
+    renderSidebar();
     app.innerHTML = html;
     loadingBarDone();
     if(attachFn) attachFn();
@@ -538,6 +571,7 @@ async function render(overrideHtml){
   const mySeq = ++renderSeq;
   loadingBarStart();
   cache.users = await fetchUsers();
+  cache.customers = await fetchCustomers();
   clearSessionIfMissing();
 
   const path = getHash();
@@ -548,7 +582,6 @@ async function render(overrideHtml){
       mount(bossLockedView(), attachBossLockedHandlers);
       return;
     }
-    cache.customers = await fetchCustomers();
     const allLog = await fetchAllLoodsLog();
     const allCustLog = await fetchAllCustomerLog();
     if(mySeq !== renderSeq) return;
@@ -561,8 +594,6 @@ async function render(overrideHtml){
     mount(loginView(), attachLoginHandlers);
     return;
   }
-
-  cache.customers = await fetchCustomers();
 
   if(path[0] === 'klanten'){
     if(mySeq !== renderSeq) return;
@@ -578,6 +609,33 @@ async function render(overrideHtml){
     if(mySeq !== renderSeq) return;
     mount(dashboardView(), attachDashboardHandlers);
   }
+}
+
+function renderSidebar(){
+  const el = document.getElementById('sidebar');
+  if(!el) return;
+  const path = getHash();
+  const active = path[0] === 'boss' ? 'boss' : (path[0] === 'klanten' || path[0] === 'klant') ? 'klanten' : 'loods';
+  const me = session ? getUser(session) : null;
+  el.innerHTML = `
+    <div class="sidebar-brand">
+      <div class="dial"><div class="dial-inner"><div class="r">2:1</div></div></div>
+      <div><h1>Wietloods</h1><p>Voorraadmanifest</p></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="sidebar-link ${active==='loods'?'active':''}" data-nav="/">${ICONS.warehouse}<span>Loods</span></a>
+      <a class="sidebar-link ${active==='klanten'?'active':''}" data-nav="/klanten">${ICONS.users}<span>Klanten</span><span class="count">${cache.customers.length}</span></a>
+      <a class="sidebar-link ${active==='boss'?'active':''}" data-boss="1">${ICONS.shield}<span>Boss menu</span></a>
+    </nav>
+    <div class="sidebar-spacer"></div>
+    <div class="sidebar-footer">
+      <span class="syncdot"><span class="d"></span>live gedeeld</span>
+      ${me ? `
+        <button class="sidebar-user" data-edit-avatar="1" title="Profielfoto wijzigen">${avatarCircleHtml(me,28)}<span>${escapeHtml(me.name)}</span></button>
+        <button class="btn secondary small" data-logout="1">Uitloggen</button>
+      ` : ''}
+    </div>
+  `;
 }
 
 function navTabsHtml(active){
@@ -679,7 +737,7 @@ function dashboardView(){
 
     <div class="who">
       <div class="name"><button class="who-avatar-btn" data-edit-avatar="1" title="Profielfoto wijzigen">${avatarCircleHtml(me, 26)}</button>${escapeHtml(me.name)}<span>${myTegoed} zakje${myTegoed===1?'':'s'} tegoed op dit moment</span></div>
-      <button class="btn secondary" data-logout="1">Uitloggen</button>
+      <button class="btn secondary who-logout" data-logout="1">Uitloggen</button>
     </div>
 
     <div class="totals" style="margin-bottom:22px;">
@@ -758,7 +816,7 @@ function klantenListView(){
 
     <div class="who">
       <div class="name"><button class="who-avatar-btn" data-edit-avatar="1" title="Profielfoto wijzigen">${avatarCircleHtml(getUser(session), 26)}</button>${escapeHtml(getUser(session).name)}<span>ingelogd</span></div>
-      <button class="btn secondary" data-logout="1">Uitloggen</button>
+      <button class="btn secondary who-logout" data-logout="1">Uitloggen</button>
     </div>
 
     <div class="totals" style="margin-bottom:22px;">
@@ -1185,17 +1243,19 @@ function attachCommonHandlers(){
       if(isBossUnlocked()){ goTo('/boss'); render(); } else { bossCodeModal(); }
     });
   });
-  const editAvatarBtn = document.querySelector('[data-edit-avatar]');
-  if(editAvatarBtn) editAvatarBtn.addEventListener('click', () => {
-    const me = getUser(session);
-    if(me) avatarModal(me);
+  document.querySelectorAll('[data-edit-avatar]').forEach(el=>{
+    el.addEventListener('click', () => {
+      const me = getUser(session);
+      if(me) avatarModal(me);
+    });
   });
-  const logoutBtn = document.querySelector('[data-logout]');
-  if(logoutBtn) logoutBtn.addEventListener('click', () => {
-    session = null;
-    localStorage.removeItem(SESSION_KEY);
-    goTo('/');
-    render();
+  document.querySelectorAll('[data-logout]').forEach(el=>{
+    el.addEventListener('click', () => {
+      session = null;
+      localStorage.removeItem(SESSION_KEY);
+      goTo('/');
+      render();
+    });
   });
 }
 
