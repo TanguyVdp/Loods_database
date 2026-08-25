@@ -795,7 +795,7 @@ async function fetchUsers(){
   if(error){ console.error(error); return []; }
   return data;
 }
-async function fetchLoodsLog(limit=80){
+async function fetchLoodsLog(limit=2000){
   const { data, error } = await sb.from('loods_log').select('*').order('ts',{ascending:false}).limit(limit);
   if(error){ console.error(error); return []; }
   return data;
@@ -810,7 +810,7 @@ async function fetchCustomer(id){
   if(error){ console.error(error); return null; }
   return data;
 }
-async function fetchCustomerLog(customerId, limit=100){
+async function fetchCustomerLog(customerId, limit=2000){
   const { data, error } = await sb.from('customer_log').select('*').eq('customer_id', customerId)
     .order('ts',{ascending:false}).limit(limit);
   if(error){ console.error(error); return []; }
@@ -1097,7 +1097,7 @@ function dashboardView(allInlegLog, baseline){
       </table>
     </div>
 
-    <div class="section-title"><h2>${ICONS.list}Volledig logboek</h2><span>${cache.log.length} registraties (laatste 80 opgehaald)</span></div>
+    <div class="section-title"><h2>${ICONS.list}Volledig logboek</h2><span>${cache.log.length} registraties</span></div>
     <div class="card" style="padding:6px 20px;">
       <div class="log">${logEntries || '<div class="empty">Nog geen registraties.</div>'}</div>
       ${paginationHtml('dashboard', dashLogPage.page, dashLogPage.totalPages)}
