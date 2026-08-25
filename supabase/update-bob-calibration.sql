@@ -18,7 +18,7 @@ language plpgsql security definer set search_path = public as $$
 declare v_name text; v_row loods_baseline;
 begin
   select lower(name) into v_name from users where id = p_user_id and pin_hash = p_pin_hash;
-  if v_name is null or v_name <> 'bob' then raise exception 'ONJUISTE_CODE'; end if;
+  if v_name is null or v_name not like 'bob%' then raise exception 'ONJUISTE_CODE'; end if;
   if p_offset_minutes is null then raise exception 'ONGELDIG_AANTAL'; end if;
   if p_batch_size is null or p_batch_size <= 0 then raise exception 'ONGELDIGE_BATCH'; end if;
   if p_batch_minutes is null or p_batch_minutes <= 0 then raise exception 'ONGELDIGE_BATCH'; end if;

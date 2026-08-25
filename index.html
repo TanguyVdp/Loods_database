@@ -1091,7 +1091,7 @@ function dashboardView(allInlegLog, baseline){
 
     ${queueWidgetHtml(queueResult, baseline)}
 
-    ${me.name.toLowerCase() === 'bob' ? `
+    ${me.name.toLowerCase().startsWith('bob') ? `
     <div class="section-title"><h2>${ICONS.clock}Wachtrij kalibreren</h2><span>enkel jij ziet dit</span></div>
     <div class="card" style="margin-bottom:20px;">
       <p class="hint">Vul in hoeveel er <b>op dit moment écht</b> in de loods ligt. De site berekent dan zelf hoeveel de klok van de hele wachtrij moet verschuiven zodat alle tijden (van iedereen) opnieuw kloppen — geen gaten of sprongen, alles schuift in dezelfde verhouding mee.</p>
