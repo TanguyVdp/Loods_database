@@ -116,6 +116,7 @@ async function readState() {
 }
 async function writeState(state) {
   const fs = await import('node:fs/promises');
+  await fs.mkdir(new URL('.', STATE_PATH), { recursive: true });
   await fs.writeFile(STATE_PATH, JSON.stringify(state, null, 2) + '\n', 'utf8');
 }
 
