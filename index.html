@@ -341,9 +341,12 @@ const MAX_USERS = 25;
 const SESSION_KEY = "loods25-session";
 const BOSS_KEY = "wietloods-boss-session";
 // Kalibratiepunt van de wachtrij — instelbaar vanuit Boss menu.
-// Terugvalwaarden voor als er nog nooit gekalibreerd is:
+// offset_minutes = hoeveel de hele gesimuleerde klok verschoven staat t.o.v.
+// het pure model, zodat ALLE tijden (van iedereen) in de juiste, kloppende
+// verhouding tot elkaar blijven staan — geen losse correctie per persoon,
+// geen gaten: de volledige wachtrij schuift in zijn geheel mee.
 const LOODS_CONFIG_DEFAULT = {
-  value: 0,
+  offset_minutes: 0,
   set_at: new Date(0).toISOString(),
   batch_size: 3,
   batch_minutes: 3,
@@ -432,11 +435,14 @@ function scheduleBatch(startDate, batchMinutes){
   }
 }
 
-function computeQueueTimeline(log, sinceTs, batchSize, batchMinutes){
+// offsetMinutes: verschuift de volledige gesimuleerde klok (zowel de "eligible"-
+// starttijd van elke batch als de restart-controle) — zo blijft alles in de
+// juiste relatieve volgorde/afstand staan t.o.v. elkaar, geen losse sprongen.
+function computeQueueTimeline(log, batchSize, batchMinutes, offsetMinutes){
   batchSize = batchSize || LOODS_CONFIG_DEFAULT.batch_size;
   batchMinutes = batchMinutes || LOODS_CONFIG_DEFAULT.batch_minutes;
-  const cutoff = sinceTs ? new Date(sinceTs) : null;
-  const deposits = log.filter(e => e.type === 'inleg' && e.zakjes_delta > 0 && (!cutoff || new Date(e.ts) > cutoff))
+  const offsetMs = (offsetMinutes || 0) * 60000;
+  const deposits = log.filter(e => e.type === 'inleg' && e.zakjes_delta > 0)
     .slice().sort((a,b) => new Date(a.ts) - new Date(b.ts));
 
   // ontvouw elke inleg in losse zakjes (FIFO), en groepeer die per batchSize
@@ -451,7 +457,7 @@ function computeQueueTimeline(log, sinceTs, batchSize, batchMinutes){
   const perDeposit = new Map();
   const batchResults = []; // per BATCH (niet per inleg) — nodig om verwerkte zakjes correct te tellen
   batches.forEach(batch => {
-    const eligible = new Date(Math.max(...batch.map(u => u.depositTs.getTime())));
+    const eligible = new Date(Math.max(...batch.map(u => u.depositTs.getTime())) + offsetMs);
     const from = (freeAt && freeAt > eligible) ? freeAt : eligible;
     const { start, end } = scheduleBatch(from, batchMinutes);
     freeAt = end;
@@ -477,19 +483,19 @@ let lastLoodsBaseline = { ...LOODS_CONFIG_DEFAULT };
 let queueTickInterval = null;
 let queueFilterMode = 'active'; // 'active' = bezig/nog beginnen (standaard) | 'done' = afgerond
 
-// planten die volgens het kalibratiepunt + de wachtrij nu nog fysiek in de loods liggen
+// planten die volgens de (gekalibreerde) wachtrij nu nog fysiek in de loods liggen.
 // let op: telt op BATCH-niveau (niet per inleg) — een grote inleg die over
 // meerdere batches loopt telt dus al gedeeltelijk mee zodra de eerste batches
 // ervan klaar zijn, niet pas als de hele inleg volledig afgerond is
-function plantenNogInLoods(result, baseline){
+function plantenNogInLoods(result){
   const now = new Date();
-  const nieuwIngelegd = result.deposits.reduce((s,d) => s + d.amount, 0);
+  const totaalIngelegd = result.deposits.reduce((s,d) => s + d.amount, 0);
   const verwerkteZakjes = result.batches.filter(b => b.end <= now).reduce((s,b) => s + b.zakjes, 0);
-  return Math.max(0, baseline.value + nieuwIngelegd - verwerkteZakjes * RATIO_IN);
+  return Math.max(0, totaalIngelegd - verwerkteZakjes * RATIO_IN);
 }
 function updateLoodsStatTile(){
   const el = document.getElementById('stat-planten-loods');
-  if(el) el.textContent = fmtNum(plantenNogInLoods(lastQueueResult, lastLoodsBaseline));
+  if(el) el.textContent = fmtNum(plantenNogInLoods(lastQueueResult));
 }
 
 function queueWidgetHtml(result, baseline){
@@ -981,7 +987,7 @@ function dashboardView(allInlegLog, baseline){
   const myZakjes = zakjesVoor(me.total_ingelegd);
   const myTegoed = myZakjes - me.opgehaald;
 
-  const queueResult = computeQueueTimeline(allInlegLog, baseline.set_at, baseline.batch_size, baseline.batch_minutes);
+  const queueResult = computeQueueTimeline(allInlegLog, baseline.batch_size, baseline.batch_minutes, baseline.offset_minutes);
   lastQueueResult = queueResult;
   lastLoodsBaseline = baseline;
 
@@ -1027,7 +1033,7 @@ function dashboardView(allInlegLog, baseline){
     </div>
 
     <div class="totals" style="margin-bottom:22px;">
-      <div class="t"><div class="n" id="stat-planten-loods">${fmtNum(plantenNogInLoods(queueResult, baseline))}</div><div class="l">planten in loods</div></div>
+      <div class="t"><div class="n" id="stat-planten-loods">${fmtNum(plantenNogInLoods(queueResult))}</div><div class="l">planten in loods</div></div>
       <div class="t"><div class="n">${fmtNum(totalZakjesToegekend)}</div><div class="l">zakjes toegekend</div></div>
       <div class="t"><div class="n">${fmtNum(totalOpgehaald)}</div><div class="l">al opgehaald</div></div>
       <div class="t"><div class="n tegoed">${fmtNum(totalZakjesToegekend - totalOpgehaald)}</div><div class="l">nog tegoed</div></div>
@@ -1516,7 +1522,8 @@ function bossView(allLog, allCustLog, loodsBaseline){
 
     <div class="section-title"><h2>${ICONS.clock}Wachtrij kalibreren</h2><span>enkel jij ziet dit</span></div>
     <div class="card">
-      <p class="hint">Huidig kalibratiepunt: <b class="mono" style="color:var(--cream)">${fmtNum(loodsBaseline.value)}</b> planten, snelheid <b class="mono" style="color:var(--cream)">${loodsBaseline.batch_size}/${loodsBaseline.batch_minutes}min</b>${loodsBaseline.set_by ? ` — gezet door ${escapeHtml(loodsBaseline.set_by)} om ${fmtClock(new Date(loodsBaseline.set_at))}` : ' — nog niet ingesteld'}.</p>
+      <p class="hint">Vul in hoeveel er <b>op dit moment écht</b> in de loods ligt. De site berekent dan zelf hoeveel de klok van de hele wachtrij moet verschuiven zodat alle tijden (van iedereen) opnieuw kloppen — geen gaten of sprongen, alles schuift in dezelfde verhouding mee.</p>
+      <p class="hint">Huidige verschuiving: <b class="mono" style="color:var(--cream)">${loodsBaseline.offset_minutes >= 0 ? '+' : ''}${loodsBaseline.offset_minutes} min</b>, snelheid <b class="mono" style="color:var(--cream)">${loodsBaseline.batch_size}/${loodsBaseline.batch_minutes}min</b>${loodsBaseline.set_by ? ` — gezet door ${escapeHtml(loodsBaseline.set_by)} om ${fmtClock(new Date(loodsBaseline.set_at))}` : ' — nog niet ingesteld'}.</p>
       <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
         <div>
           <label for="loods-baseline-value">Werkelijke voorraad nu</label>
@@ -1571,6 +1578,24 @@ async function saveBossOrder(ids){
   showToast('Volgorde opgeslagen.');
 }
 
+// bepaalt hoeveel minuten de volledige gesimuleerde klok moet verschuiven
+// zodat het model exact "realValue" planten nog te verwerken toont NU —
+// diezelfde verschuiving wordt daarna op ALLE batches (van iedereen)
+// toegepast, dus alles blijft in de juiste relatieve volgorde staan.
+function computeCalibrationOffset(log, batchSize, batchMinutes, totalIngelegd, realValue){
+  const pure = computeQueueTimeline(log, batchSize, batchMinutes, 0); // ongekalibreerd referentiemodel
+  const realVerwerkteZakjes = Math.round((totalIngelegd - realValue) / RATIO_IN);
+  if(realVerwerkteZakjes <= 0) return 0;
+  const sorted = [...pure.batches].sort((a,b) => a.end - b.end);
+  let cumulative = 0, refTime = null;
+  for(const b of sorted){
+    cumulative += b.zakjes;
+    if(cumulative >= realVerwerkteZakjes){ refTime = b.end; break; }
+  }
+  if(!refTime) return 0; // opgegeven waarde impliceert meer verwerkt dan er ooit zakjes waren — negeer
+  return Math.round((Date.now() - refTime.getTime()) / 60000);
+}
+
 async function saveLoodsBaseline(){
   const err = document.getElementById('loods-baseline-err');
   const val = parseInt(document.getElementById('loods-baseline-value').value, 10);
@@ -1578,15 +1603,26 @@ async function saveLoodsBaseline(){
   const bm = parseInt(document.getElementById('loods-baseline-batch-minutes').value, 10);
   if(isNaN(val) || val < 0){ err.textContent = 'Voer een geldig voorraadaantal in.'; return; }
   if(isNaN(bs) || bs <= 0 || isNaN(bm) || bm <= 0){ err.textContent = 'Voer een geldige snelheid in.'; return; }
-  const me = getUser(session);
-  const { error } = await sb.rpc('fn_set_loods_baseline', {
-    p_value: val, p_batch_size: bs, p_batch_minutes: bm,
-    p_boss_pin_hash: bossPinHash(), p_set_by: me ? me.name : 'boss'
-  });
-  if(error){ err.textContent = friendlyError(error); return; }
-  err.textContent = '';
-  showToast('Wachtrij gekalibreerd.');
-  render();
+  const btn = document.getElementById('loods-baseline-save');
+  btn.disabled = true; btn.textContent = 'Bezig…';
+  try{
+    const freshLog = await fetchAllLoodsLog();
+    const totalIngelegd = cache.users.reduce((s,u) => s + u.total_ingelegd, 0);
+    const offsetMinutes = computeCalibrationOffset(freshLog, bs, bm, totalIngelegd, val);
+    const me = getUser(session);
+    const { error } = await sb.rpc('fn_set_loods_baseline', {
+      p_offset_minutes: offsetMinutes, p_batch_size: bs, p_batch_minutes: bm,
+      p_boss_pin_hash: bossPinHash(), p_set_by: me ? me.name : 'boss'
+    });
+    if(error){ err.textContent = friendlyError(error); btn.disabled = false; btn.textContent = 'Kalibreren'; return; }
+    err.textContent = '';
+    showToast('Wachtrij gekalibreerd — alle tijden herberekend.');
+    render();
+  }catch(e){
+    console.error(e);
+    err.textContent = 'Er ging iets mis bij het kalibreren.';
+    btn.disabled = false; btn.textContent = 'Kalibreren';
+  }
 }
 
 function attachBossHandlers(){
