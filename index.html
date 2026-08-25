@@ -405,9 +405,9 @@ function fmtDuration(ms){
 // Puur berekend uit bestaande 'inleg'-registraties, schrijft niets weg.
 // Server-restarts: tijdens deze dagelijkse vensters wordt er niet verwerkt.
 const RESTART_WINDOWS = [
-  { h: 7, m: 55, endH: 8, endM: 10 },
-  { h: 11, m: 55, endH: 12, endM: 10 },
-  { h: 17, m: 55, endH: 18, endM: 10 }
+  { h: 7, m: 58, endH: 8, endM: 3 },
+  { h: 11, m: 58, endH: 12, endM: 3 },
+  { h: 17, m: 58, endH: 18, endM: 3 }
 ];
 // vindt het vroegste restart-venster dat overlapt met het interval start t/m end
 function findEarliestBlackoutOverlap(start, end){
@@ -505,7 +505,7 @@ function queueWidgetHtml(result, baseline){
   const done = deposits.filter(t => t.end <= now).sort((a,b) => b.end - a.end).slice(0, 100);
   const filter = queueFilterMode;
   const list = filter === 'done' ? done : active;
-  const hint = `Eerlijk op volgorde van inleg (FIFO) — batches van ${baseline.batch_size} zakjes per ${baseline.batch_minutes} min. Een batch die een server-restart raakt (7u55-8u10, 11u55-12u10, 17u55-18u10) herbegint volledig na de restart.`;
+  const hint = `Eerlijk op volgorde van inleg (FIFO) — batches van ${baseline.batch_size} zakjes per ${baseline.batch_minutes} min. Een batch die een server-restart raakt (7u58-8u03, 11u58-12u03, 17u58-18u03) herbegint volledig na de restart.`;
 
   const pendingEnds = result.batches.map(b => b.end).filter(e => e > now);
   const etaLine = pendingEnds.length ? (() => {

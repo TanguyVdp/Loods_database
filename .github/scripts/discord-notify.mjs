@@ -40,9 +40,9 @@ async function sbGet(path, extraHeaders) {
 
 // ---------- exacte kopie van de wachtrij-logica uit index.html ----------
 const RESTART_WINDOWS = [
-  { h: 7, m: 55, endH: 8, endM: 10 },
-  { h: 11, m: 55, endH: 12, endM: 10 },
-  { h: 17, m: 55, endH: 18, endM: 10 }
+  { h: 7, m: 58, endH: 8, endM: 3 },
+  { h: 11, m: 58, endH: 12, endM: 3 },
+  { h: 17, m: 58, endH: 18, endM: 3 }
 ];
 function findEarliestBlackoutOverlap(start, end) {
   let best = null;
