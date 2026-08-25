@@ -1,8 +1,8 @@
 -- ============================================================
--- Wietloods — TEST: kalibratie van de wachtrij, vanuit Boss menu
--- Enkel nodig voor de test-wachtrij (test/index.html). Voer dit uit in de
--- Supabase SQL Editor. Veilig om opnieuw te runnen als je een vorige versie
--- al had (create/alter "if not exists", "create or replace").
+-- Wietloods — update: verwerkingswachtrij + kalibratie (Boss menu)
+-- Voegt de "Verwerkingswachtrij" toe aan de Loods-pagina en de kalibratie-
+-- kaart aan het Boss menu. Voer dit EENMALIG uit in de Supabase SQL Editor.
+-- Veilig om opnieuw te runnen (create/alter "if not exists", "create or replace").
 -- ============================================================
 
 create table if not exists loods_baseline (
