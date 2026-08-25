@@ -1003,7 +1003,7 @@ function dashboardView(allInlegLog, baseline){
     ${navTabsHtml('loods')}
 
     <div class="who">
-      <div class="name"><button class="who-avatar-btn" data-edit-avatar="1" title="Profielfoto wijzigen">${avatarCircleHtml(me, 26)}</button>${escapeHtml(me.name)}<span>${myTegoed} zakje${myTegoed===1?'':'s'} tegoed op dit moment</span></div>
+      <div class="name"><button class="who-avatar-btn" data-edit-avatar="1" title="Profielfoto wijzigen">${avatarCircleHtml(me, 26)}</button>${escapeHtml(me.name)}<span><b class="tegoed">${myTegoed}</b> zakje${myTegoed===1?'':'s'} tegoed op dit moment</span></div>
       <button class="btn secondary who-logout" data-logout="1">Uitloggen</button>
     </div>
 
