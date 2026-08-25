@@ -2,8 +2,8 @@ name: Discord-notificatie zakjes klaar
 
 on:
   schedule:
-    - cron: '2-59/5 * * * *'   # elke 5 min, maar 2 min na de ronde grens — minder drukte in GitHub's wachtrij dan xx:00/xx:05/...
-  workflow_dispatch: {}       # handmatig te starten via de Actions-tab, handig om te testen
+    - cron: '7,37 * * * *'   # backup, 2x/uur — GitHub's eigen schedule is onbetrouwbaar bij korte intervallen
+  workflow_dispatch: {}       # handmatig via de Actions-tab, EN het echte 5-min-ritme via een externe pinger (cron-job.org) die dit endpoint aanroept
 
 permissions:
   contents: write
