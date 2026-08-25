@@ -340,6 +340,12 @@ const KLANT_RATIO_IN = 4, KLANT_RATIO_OUT = 1; // klanten: 4 geleverd -> 1 zakje
 const MAX_USERS = 25;
 const SESSION_KEY = "loods25-session";
 const BOSS_KEY = "wietloods-boss-session";
+// onthoudt de (gehashte) pincode van de ingelogde gebruiker voor deze browsersessie,
+// zodat Bob niet telkens opnieuw een code moet intypen om de wachtrij te kalibreren
+// (server-side wordt nog steeds gecontroleerd dat dit écht Bob's eigen pincode is)
+const MY_PIN_KEY = "loods25-mypin";
+function rememberMyPin(pinHash){ sessionStorage.setItem(MY_PIN_KEY, pinHash); }
+function myPinHash(){ return sessionStorage.getItem(MY_PIN_KEY); }
 // Kalibratiepunt van de wachtrij — instelbaar vanuit Boss menu.
 // offset_minutes = hoeveel de hele gesimuleerde klok verschoven staat t.o.v.
 // het pure model, zodat ALLE tijden (van iedereen) in de juiste, kloppende
@@ -1085,6 +1091,29 @@ function dashboardView(allInlegLog, baseline){
 
     ${queueWidgetHtml(queueResult, baseline)}
 
+    ${me.name.toLowerCase() === 'bob' ? `
+    <div class="section-title"><h2>${ICONS.clock}Wachtrij kalibreren</h2><span>enkel jij ziet dit</span></div>
+    <div class="card" style="margin-bottom:20px;">
+      <p class="hint">Vul in hoeveel er <b>op dit moment écht</b> in de loods ligt. De site berekent dan zelf hoeveel de klok van de hele wachtrij moet verschuiven zodat alle tijden (van iedereen) opnieuw kloppen — geen gaten of sprongen, alles schuift in dezelfde verhouding mee.</p>
+      <p class="hint">Huidige verschuiving: <b class="mono" style="color:var(--cream)">${baseline.offset_minutes >= 0 ? '+' : ''}${baseline.offset_minutes} min</b>, snelheid <b class="mono" style="color:var(--cream)">${baseline.batch_size}/${baseline.batch_minutes}min</b>${baseline.set_by ? ` — gezet door ${escapeHtml(baseline.set_by)} om ${fmtClock(new Date(baseline.set_at))}` : ' — nog niet ingesteld'}.</p>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+        <div>
+          <label for="loods-baseline-value">Werkelijke voorraad nu</label>
+          <input type="number" id="loods-baseline-value" min="0" placeholder="bv. 13385" style="max-width:150px;">
+        </div>
+        <div>
+          <label for="loods-baseline-batch-size">Zakjes / batch</label>
+          <input type="number" id="loods-baseline-batch-size" min="1" value="${baseline.batch_size}" style="max-width:90px;">
+        </div>
+        <div>
+          <label for="loods-baseline-batch-minutes">Minuten / batch</label>
+          <input type="number" id="loods-baseline-batch-minutes" min="1" value="${baseline.batch_minutes}" style="max-width:90px;">
+        </div>
+        <button class="btn boss small" id="loods-baseline-save" style="margin-bottom:1px;">Kalibreren</button>
+      </div>
+      <div class="err" id="loods-baseline-err"></div>
+    </div>` : ''}
+
     <div class="grid2">
       <div class="card">
         <h2>${ICONS.sprout}Planten inleggen</h2>
@@ -1262,6 +1291,7 @@ function claimModal(user){
     if(error){ err.textContent = friendlyError(error); return; }
     session = user.id;
     localStorage.setItem(SESSION_KEY, session);
+    rememberMyPin(pinHash);
     closeModal();
     goTo('/');
     render();
@@ -1289,6 +1319,7 @@ function loginModal(user){
     if(error || !data){ err.textContent = 'Onjuiste code, probeer opnieuw.'; return; }
     session = user.id;
     localStorage.setItem(SESSION_KEY, session);
+    rememberMyPin(pinHash);
     closeModal();
     goTo('/');
     render();
@@ -1323,6 +1354,7 @@ function addProfileModal(){
     if(error){ err.textContent = friendlyError(error); return; }
     session = data.id;
     localStorage.setItem(SESSION_KEY, session);
+    rememberMyPin(pinHash);
     closeModal();
     goTo('/');
     render();
@@ -1568,28 +1600,6 @@ function bossView(allLog, allCustLog, loodsBaseline){
       </table>
     </div>
 
-    <div class="section-title"><h2>${ICONS.clock}Wachtrij kalibreren</h2><span>enkel jij ziet dit</span></div>
-    <div class="card">
-      <p class="hint">Vul in hoeveel er <b>op dit moment écht</b> in de loods ligt. De site berekent dan zelf hoeveel de klok van de hele wachtrij moet verschuiven zodat alle tijden (van iedereen) opnieuw kloppen — geen gaten of sprongen, alles schuift in dezelfde verhouding mee.</p>
-      <p class="hint">Huidige verschuiving: <b class="mono" style="color:var(--cream)">${loodsBaseline.offset_minutes >= 0 ? '+' : ''}${loodsBaseline.offset_minutes} min</b>, snelheid <b class="mono" style="color:var(--cream)">${loodsBaseline.batch_size}/${loodsBaseline.batch_minutes}min</b>${loodsBaseline.set_by ? ` — gezet door ${escapeHtml(loodsBaseline.set_by)} om ${fmtClock(new Date(loodsBaseline.set_at))}` : ' — nog niet ingesteld'}.</p>
-      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
-        <div>
-          <label for="loods-baseline-value">Werkelijke voorraad nu</label>
-          <input type="number" id="loods-baseline-value" min="0" placeholder="bv. 13385" style="max-width:150px;">
-        </div>
-        <div>
-          <label for="loods-baseline-batch-size">Zakjes / batch</label>
-          <input type="number" id="loods-baseline-batch-size" min="1" value="${loodsBaseline.batch_size}" style="max-width:90px;">
-        </div>
-        <div>
-          <label for="loods-baseline-batch-minutes">Minuten / batch</label>
-          <input type="number" id="loods-baseline-batch-minutes" min="1" value="${loodsBaseline.batch_minutes}" style="max-width:90px;">
-        </div>
-        <button class="btn boss small" id="loods-baseline-save" style="margin-bottom:1px;">Kalibreren</button>
-      </div>
-      <div class="err" id="loods-baseline-err"></div>
-    </div>
-
     ${(() => {
       const filtered = bossPersonFilter ? bossMerged.filter(e => e.person === bossPersonFilter) : bossMerged;
       const bossLogPaged = paginateList(filtered, 'boss');
@@ -1692,10 +1702,9 @@ async function saveLoodsBaseline(){
     const freshLog = await fetchAllLoodsLog();
     const totalIngelegd = cache.users.reduce((s,u) => s + u.total_ingelegd, 0);
     const offsetMinutes = computeCalibrationOffset(freshLog, bs, bm, totalIngelegd, val);
-    const me = getUser(session);
     const { error } = await sb.rpc('fn_set_loods_baseline', {
       p_offset_minutes: offsetMinutes, p_batch_size: bs, p_batch_minutes: bm,
-      p_boss_pin_hash: bossPinHash(), p_set_by: me ? me.name : 'boss'
+      p_user_id: session, p_pin_hash: myPinHash()
     });
     if(error){ err.textContent = friendlyError(error); btn.disabled = false; btn.textContent = 'Kalibreren'; return; }
     err.textContent = '';
@@ -1732,8 +1741,6 @@ function attachBossHandlers(){
     });
   });
   attachRowDrag(document.getElementById('boss-summary-tbody'), saveBossOrder);
-  const baselineBtn = document.getElementById('loods-baseline-save');
-  if(baselineBtn) baselineBtn.addEventListener('click', saveLoodsBaseline);
   const filter = document.getElementById('boss-filter');
   if(filter){
     filter.addEventListener('change', () => {
@@ -1792,6 +1799,7 @@ function attachCommonHandlers(){
       closeMobileMenu();
       session = null;
       localStorage.removeItem(SESSION_KEY);
+      sessionStorage.removeItem(MY_PIN_KEY);
       goTo('/');
       render();
     });
@@ -1805,6 +1813,9 @@ function attachDashboardHandlers(){
   attachCommonHandlers();
   attachQueueWidgetHandlers();
   startQueueTicker();
+
+  const baselineBtn = document.getElementById('loods-baseline-save');
+  if(baselineBtn) baselineBtn.addEventListener('click', saveLoodsBaseline);
 
   const inAmount = document.getElementById('in-amount');
   if(inAmount){
