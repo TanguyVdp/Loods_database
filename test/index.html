@@ -432,11 +432,13 @@ function computeQueueTimeline(log, sinceTs, batchSize, batchMinutes){
 
   let freeAt = null;
   const perDeposit = new Map();
+  const batchResults = []; // per BATCH (niet per inleg) — nodig om verwerkte zakjes correct te tellen
   batches.forEach(batch => {
     const eligible = new Date(Math.max(...batch.map(u => u.depositTs.getTime())));
     const from = (freeAt && freeAt > eligible) ? freeAt : eligible;
     const { start, end } = scheduleBatch(from, batchMinutes);
     freeAt = end;
+    batchResults.push({ start, end, zakjes: batch.length });
     batch.forEach(u => {
       if(!perDeposit.has(u.depositIndex)){
         perDeposit.set(u.depositIndex, { userName: deposits[u.depositIndex].user_name, amount: deposits[u.depositIndex].amount, zakjes: 0, start, end });
@@ -447,29 +449,36 @@ function computeQueueTimeline(log, sinceTs, batchSize, batchMinutes){
       if(end > d.end) d.end = end;
     });
   });
-  return [...perDeposit.values()];
+  // deposits = voor weergave (1 regel per inleg); batches = voor de correcte
+  // "hoeveel is er al verwerkt"-telling (per batch, niet pas als de HELE inleg
+  // — die over meerdere batches kan lopen — helemaal af is)
+  return { deposits: [...perDeposit.values()], batches: batchResults };
 }
 
-let lastQueueTimeline = [];
+let lastQueueResult = { deposits: [], batches: [] };
 let queueTickInterval = null;
 let queueFilterMode = 'active'; // 'active' = bezig/nog beginnen (standaard) | 'done' = afgerond
 
 // planten die volgens LOODS_CONFIG + de wachtrij nu nog fysiek in de loods liggen
-function plantenNogInLoods(timeline){
+// let op: telt op BATCH-niveau (niet per inleg) — een grote inleg die over
+// meerdere batches loopt telt dus al gedeeltelijk mee zodra de eerste batches
+// ervan klaar zijn, niet pas als de hele inleg volledig afgerond is
+function plantenNogInLoods(result){
   const now = new Date();
-  const nieuwIngelegd = timeline.reduce((s,t) => s + t.amount, 0);
-  const verwerkteZakjes = timeline.filter(t => t.end <= now).reduce((s,t) => s + t.zakjes, 0);
+  const nieuwIngelegd = result.deposits.reduce((s,d) => s + d.amount, 0);
+  const verwerkteZakjes = result.batches.filter(b => b.end <= now).reduce((s,b) => s + b.zakjes, 0);
   return Math.max(0, LOODS_CONFIG.value + nieuwIngelegd - verwerkteZakjes * RATIO_IN);
 }
 function updateLoodsStatTile(){
   const el = document.getElementById('stat-planten-loods');
-  if(el) el.textContent = fmtNum(plantenNogInLoods(lastQueueTimeline));
+  if(el) el.textContent = fmtNum(plantenNogInLoods(lastQueueResult));
 }
 
-function queueWidgetHtml(timeline){
+function queueWidgetHtml(result){
+  const deposits = result.deposits;
   const now = new Date();
-  const active = timeline.filter(t => t.end > now).sort((a,b) => a.start - b.start);
-  const done = timeline.filter(t => t.end <= now).sort((a,b) => b.end - a.end).slice(0, 100);
+  const active = deposits.filter(t => t.end > now).sort((a,b) => a.start - b.start);
+  const done = deposits.filter(t => t.end <= now).sort((a,b) => b.end - a.end).slice(0, 100);
   const filter = queueFilterMode;
   const list = filter === 'done' ? done : active;
   const hint = `Eerlijk op volgorde van inleg (FIFO) — batches van ${LOODS_CONFIG.batch_size} zakjes per ${LOODS_CONFIG.batch_minutes} min. Een batch die een server-restart raakt (7u55-8u10, 11u55-12u10, 17u55-18u10) herbegint volledig na de restart.`;
@@ -523,7 +532,7 @@ function attachQueueWidgetHandlers(){
   if(sel) sel.addEventListener('change', () => {
     queueFilterMode = sel.value;
     const el = document.getElementById('queue-widget');
-    if(el){ el.outerHTML = queueWidgetHtml(lastQueueTimeline); attachQueueWidgetHandlers(); }
+    if(el){ el.outerHTML = queueWidgetHtml(lastQueueResult); attachQueueWidgetHandlers(); }
   });
 }
 function startQueueTicker(){
@@ -531,7 +540,7 @@ function startQueueTicker(){
   queueTickInterval = setInterval(() => {
     const el = document.getElementById('queue-widget');
     if(!el){ clearInterval(queueTickInterval); return; }
-    el.outerHTML = queueWidgetHtml(lastQueueTimeline);
+    el.outerHTML = queueWidgetHtml(lastQueueResult);
     attachQueueWidgetHandlers();
     updateLoodsStatTile();
   }, 20000);
@@ -944,8 +953,8 @@ function dashboardView(allInlegLog){
   const myZakjes = zakjesVoor(me.total_ingelegd);
   const myTegoed = myZakjes - me.opgehaald;
 
-  const queueTimeline = computeQueueTimeline(allInlegLog, LOODS_CONFIG.set_at, LOODS_CONFIG.batch_size, LOODS_CONFIG.batch_minutes);
-  lastQueueTimeline = queueTimeline;
+  const queueResult = computeQueueTimeline(allInlegLog, LOODS_CONFIG.set_at, LOODS_CONFIG.batch_size, LOODS_CONFIG.batch_minutes);
+  lastQueueResult = queueResult;
 
   const rows = [...cache.users].sort((a,b)=> (zakjesVoor(b.total_ingelegd)-b.opgehaald) - (zakjesVoor(a.total_ingelegd)-a.opgehaald))
     .map(u => {
@@ -989,7 +998,7 @@ function dashboardView(allInlegLog){
     </div>
 
     <div class="totals" style="margin-bottom:22px;">
-      <div class="t"><div class="n" id="stat-planten-loods">${fmtNum(plantenNogInLoods(queueTimeline))}</div><div class="l">planten in loods</div></div>
+      <div class="t"><div class="n" id="stat-planten-loods">${fmtNum(plantenNogInLoods(queueResult))}</div><div class="l">planten in loods</div></div>
       <div class="t"><div class="n">${fmtNum(totalZakjesToegekend)}</div><div class="l">zakjes toegekend</div></div>
       <div class="t"><div class="n">${fmtNum(totalOpgehaald)}</div><div class="l">al opgehaald</div></div>
       <div class="t"><div class="n tegoed">${fmtNum(totalZakjesToegekend - totalOpgehaald)}</div><div class="l">nog tegoed</div></div>
@@ -1000,7 +1009,7 @@ function dashboardView(allInlegLog){
       <div class="progress-label"><b>${totalOpgehaald}</b> van <b>${totalZakjesToegekend}</b> toegekende zakjes al opgehaald (${totalZakjesToegekend>0 ? Math.round(totalOpgehaald/totalZakjesToegekend*100) : 0}%)</div>
     </div>
 
-    ${queueWidgetHtml(queueTimeline)}
+    ${queueWidgetHtml(queueResult)}
 
     <div class="grid2">
       <div class="card">
