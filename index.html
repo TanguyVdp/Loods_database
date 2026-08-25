@@ -467,16 +467,19 @@ function computeQueueTimeline(log, batchSize, batchMinutes, offsetMinutes){
     const from = (freeAt && freeAt > eligible) ? freeAt : eligible;
     const { start, end } = scheduleBatch(from, batchMinutes);
     freeAt = end;
-    batchResults.push({ start, end, zakjes: batch.length });
+    const byUser = {}; // hoeveel zakjes van deze batch per persoon — nodig voor per-profiel "momenteel"-cijfers
     batch.forEach(u => {
+      const uname = deposits[u.depositIndex].user_name;
+      byUser[uname] = (byUser[uname] || 0) + 1;
       if(!perDeposit.has(u.depositIndex)){
-        perDeposit.set(u.depositIndex, { userName: deposits[u.depositIndex].user_name, amount: deposits[u.depositIndex].amount, zakjes: 0, start, end });
+        perDeposit.set(u.depositIndex, { userName: uname, amount: deposits[u.depositIndex].amount, zakjes: 0, start, end });
       }
       const d = perDeposit.get(u.depositIndex);
       d.zakjes += 1;
       if(start < d.start) d.start = start;
       if(end > d.end) d.end = end;
     });
+    batchResults.push({ start, end, zakjes: batch.length, byUser });
   });
   // deposits = voor weergave (1 regel per inleg); batches = voor de correcte
   // "hoeveel is er al verwerkt"-telling (per batch, niet pas als de HELE inleg
@@ -496,6 +499,17 @@ let queueFilterMode = 'active'; // 'active' = bezig/nog beginnen (standaard) | '
 function verwerkteZakjesInQueue(result){
   const now = new Date();
   return result.batches.filter(b => b.end <= now).reduce((s,b) => s + b.zakjes, 0);
+}
+// zelfde telling, maar per persoon (userName -> aantal al verwerkte zakjes)
+function verwerkteZakjesPerPersoon(result){
+  const now = new Date();
+  const map = new Map();
+  result.batches.filter(b => b.end <= now).forEach(b => {
+    Object.entries(b.byUser).forEach(([name, count]) => {
+      map.set(name, (map.get(name) || 0) + count);
+    });
+  });
+  return map;
 }
 // planten die volgens de wachtrij nu nog fysiek in de loods liggen (nog niet
 // door een batch verwerkt)
@@ -517,6 +531,17 @@ function updateLoodsStatTile(){
   if(el2){
     const totalOpgehaald = cache.users.reduce((s,u) => s + u.opgehaald, 0);
     el2.textContent = fmtNum(zakjesKlaarInLoods(lastQueueResult, totalOpgehaald));
+  }
+  // per-profiel "momenteel inleg" / "momenteel tegoed" kolommen, indien de tabel op het scherm staat
+  if(document.querySelector('[data-momenteel-inleg]')){
+    const verwerktPerPersoon = verwerkteZakjesPerPersoon(lastQueueResult);
+    cache.users.forEach(u => {
+      const verwerkt = verwerktPerPersoon.get(u.name) || 0;
+      const c1 = document.querySelector(`[data-momenteel-inleg="${CSS.escape(u.name)}"]`);
+      if(c1) c1.textContent = fmtNum(Math.max(0, u.total_ingelegd - verwerkt * RATIO_IN));
+      const c2 = document.querySelector(`[data-momenteel-tegoed="${CSS.escape(u.name)}"]`);
+      if(c2) c2.textContent = fmtNum(Math.max(0, verwerkt - u.opgehaald));
+    });
   }
 }
 
@@ -1034,15 +1059,21 @@ function dashboardView(allInlegLog, baseline){
   lastQueueResult = queueResult;
   lastLoodsBaseline = baseline;
 
+  const verwerktPerPersoon = verwerkteZakjesPerPersoon(queueResult);
   const rows = [...cache.users].sort((a,b)=> (zakjesVoor(b.total_ingelegd)-b.opgehaald) - (zakjesVoor(a.total_ingelegd)-a.opgehaald))
     .map(u => {
       const z = zakjesVoor(u.total_ingelegd);
       const tegoed = z - u.opgehaald;
+      const verwerkt = verwerktPerPersoon.get(u.name) || 0;
+      const momenteelInleg = Math.max(0, u.total_ingelegd - verwerkt * RATIO_IN);
+      const momenteelTegoed = Math.max(0, verwerkt - u.opgehaald);
       return `<tr class="${u.id===me.id?'me':''}">
         <td>${personDot(u.name)}${escapeHtml(u.name)}</td>
         <td class="num">${fmtNum(u.total_ingelegd)}</td>
+        <td class="num" data-momenteel-inleg="${escapeHtml(u.name)}">${fmtNum(momenteelInleg)}</td>
         <td class="num">${fmtNum(z)}</td>
         <td class="num">${fmtNum(u.opgehaald)}</td>
+        <td class="num" data-momenteel-tegoed="${escapeHtml(u.name)}">${fmtNum(momenteelTegoed)}</td>
         <td class="num tegoed">${fmtNum(tegoed)}</td>
       </tr>`;
     }).join('');
@@ -1138,7 +1169,7 @@ function dashboardView(allInlegLog, baseline){
     <div class="section-title"><h2>${ICONS.users}Overzicht per profiel</h2><span>${cache.users.length}/${MAX_USERS} profielen</span></div>
     <div class="card" style="padding:14px 20px;">
       <table>
-        <thead><tr><th>Naam</th><th class="num">Ingelegd</th><th class="num">Zakjes</th><th class="num">Opgehaald</th><th class="num">Tegoed</th></tr></thead>
+        <thead><tr><th>Naam</th><th class="num">Ingelegd</th><th class="num">Momenteel inleg</th><th class="num">Totale zakjes</th><th class="num">Opgehaald</th><th class="num">Momenteel tegoed</th><th class="num">Tegoed</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
