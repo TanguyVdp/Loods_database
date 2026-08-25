@@ -452,6 +452,7 @@ function computeQueueTimeline(log, sinceTs, batchSize, batchMinutes){
 
 let lastQueueTimeline = [];
 let queueTickInterval = null;
+let queueFilterMode = 'active'; // 'active' = bezig/nog beginnen (standaard) | 'done' = afgerond
 
 // planten die volgens LOODS_CONFIG + de wachtrij nu nog fysiek in de loods liggen
 function plantenNogInLoods(timeline){
@@ -467,37 +468,63 @@ function updateLoodsStatTile(){
 
 function queueWidgetHtml(timeline){
   const now = new Date();
-  const active = timeline.filter(t => t.end > now);
+  const active = timeline.filter(t => t.end > now).sort((a,b) => a.start - b.start);
+  const done = timeline.filter(t => t.end <= now).sort((a,b) => b.end - a.end).slice(0, 100);
+  const filter = queueFilterMode;
+  const list = filter === 'done' ? done : active;
   const hint = `Eerlijk op volgorde van inleg (FIFO) — batches van ${LOODS_CONFIG.batch_size} zakjes per ${LOODS_CONFIG.batch_minutes} min. Een batch die een server-restart raakt (7u55-8u10, 11u55-12u10, 17u55-18u10) herbegint volledig na de restart.`;
 
-  if(active.length === 0){
+  const filterRow = `
+    <select id="queue-filter" class="select-field" style="margin-bottom:14px;">
+      <option value="active" ${filter==='active'?'selected':''}>Nog bezig / nog beginnen (${active.length})</option>
+      <option value="done" ${filter==='done'?'selected':''}>Afgerond (${done.length})</option>
+    </select>`;
+
+  if(list.length === 0){
     return `<div class="card" id="queue-widget" style="margin-bottom:20px;">
       <h2>${ICONS.clock}Verwerkingswachtrij <span class="pill" style="margin-left:6px;">TEST</span></h2>
       <p class="hint">${hint}</p>
-      <div class="empty">Wachtrij is momenteel leeg.</div>
+      ${filterRow}
+      <div class="empty">${filter==='done' ? 'Nog niets afgerond.' : 'Wachtrij is momenteel leeg.'}</div>
     </div>`;
   }
 
-  const rows = active.map((t, i) => {
-    const processing = t.start <= now && now < t.end;
-    const remainingMin = Math.max(0, Math.ceil((t.end - now) / 60000));
-    const statusText = processing
-      ? `wordt verwerkt · nog ${remainingMin} min`
-      : `wacht op zijn beurt · start om ${fmtClock(t.start)}`;
-    return `<div class="entry ${processing ? 'inleg' : ''}">
+  const rows = list.map((t, i) => {
+    const processing = filter === 'active' && t.start <= now && now < t.end;
+    let statusText, deltaText;
+    if(filter === 'done'){
+      statusText = 'voltooid';
+      deltaText = '✓';
+    } else {
+      const remainingMin = Math.max(0, Math.ceil((t.end - now) / 60000));
+      statusText = processing
+        ? `wordt verwerkt · nog ${remainingMin} min`
+        : `wacht op zijn beurt · start om ${fmtClock(t.start)}`;
+      deltaText = processing ? '⏳' : '#' + (i+1);
+    }
+    return `<div class="entry ${(processing || filter==='done') ? 'inleg' : ''}">
       <div class="ts">${fmtDate(t.start)} | ${fmtClock(t.start)} - ${fmtClock(t.end)}</div>
       <div class="desc">${personDot(t.userName)}<b>${escapeHtml(t.userName)}</b> — ${t.zakjes} zakje${t.zakjes===1?'':'s'}
         <span class="sub">${statusText}</span>
       </div>
-      <div class="delta">${processing ? '⏳' : '#' + (i+1)}</div>
+      <div class="delta">${deltaText}</div>
     </div>`;
   }).join('');
 
   return `<div class="card" id="queue-widget" style="margin-bottom:20px;">
     <h2>${ICONS.clock}Verwerkingswachtrij <span class="pill" style="margin-left:6px;">TEST</span></h2>
     <p class="hint">${hint}</p>
+    ${filterRow}
     <div class="log">${rows}</div>
   </div>`;
+}
+function attachQueueWidgetHandlers(){
+  const sel = document.getElementById('queue-filter');
+  if(sel) sel.addEventListener('change', () => {
+    queueFilterMode = sel.value;
+    const el = document.getElementById('queue-widget');
+    if(el){ el.outerHTML = queueWidgetHtml(lastQueueTimeline); attachQueueWidgetHandlers(); }
+  });
 }
 function startQueueTicker(){
   if(queueTickInterval) clearInterval(queueTickInterval);
@@ -505,6 +532,7 @@ function startQueueTicker(){
     const el = document.getElementById('queue-widget');
     if(!el){ clearInterval(queueTickInterval); return; }
     el.outerHTML = queueWidgetHtml(lastQueueTimeline);
+    attachQueueWidgetHandlers();
     updateLoodsStatTile();
   }, 20000);
 }
@@ -1564,6 +1592,7 @@ function attachCommonHandlers(){
 // ---------- event wiring: loods dashboard ----------
 function attachDashboardHandlers(){
   attachCommonHandlers();
+  attachQueueWidgetHandlers();
   startQueueTicker();
 
   const inAmount = document.getElementById('in-amount');
