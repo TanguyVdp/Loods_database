@@ -386,6 +386,17 @@ function fmtTs(ts){
 }
 function fmtClock(d){ return d.toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'}); }
 function fmtDate(d){ return d.toLocaleDateString('nl-BE',{day:'2-digit',month:'2-digit'}); }
+function fmtDuration(ms){
+  const totalMin = Math.max(0, Math.round(ms / 60000));
+  const days = Math.floor(totalMin / 1440);
+  const hours = Math.floor((totalMin % 1440) / 60);
+  const mins = totalMin % 60;
+  const parts = [];
+  if(days > 0) parts.push(`${days}d`);
+  if(days > 0 || hours > 0) parts.push(`${hours}u`);
+  parts.push(`${mins}min`);
+  return parts.join(' ');
+}
 
 // ---------- verwerkingswachtrij (FIFO, batches van 3 zakjes/3 min) ----------
 // Puur berekend uit bestaande 'inleg'-registraties, schrijft niets weg.
@@ -490,6 +501,12 @@ function queueWidgetHtml(result, baseline){
   const list = filter === 'done' ? done : active;
   const hint = `Eerlijk op volgorde van inleg (FIFO) — batches van ${baseline.batch_size} zakjes per ${baseline.batch_minutes} min. Een batch die een server-restart raakt (7u55-8u10, 11u55-12u10, 17u55-18u10) herbegint volledig na de restart.`;
 
+  const pendingEnds = result.batches.map(b => b.end).filter(e => e > now);
+  const etaLine = pendingEnds.length ? (() => {
+    const finishAt = new Date(Math.max(...pendingEnds.map(d => d.getTime())));
+    return `<p class="hint" style="margin-bottom:14px;">Volledige wachtrij verwerkt over <b class="mono" style="color:var(--lime)">${fmtDuration(finishAt - now)}</b> — klaar rond <b>${fmtDate(finishAt)} ${fmtClock(finishAt)}</b>.</p>`;
+  })() : '';
+
   const filterRow = `
     <select id="queue-filter" class="select-field" style="margin-bottom:14px;">
       <option value="active" ${filter==='active'?'selected':''}>Nog bezig / nog beginnen (${active.length})</option>
@@ -499,6 +516,7 @@ function queueWidgetHtml(result, baseline){
   if(list.length === 0){
     return `<div class="card" id="queue-widget" style="margin-bottom:20px;">
       <h2>${ICONS.clock}Verwerkingswachtrij</h2>
+      ${etaLine}
       <p class="hint">${hint}</p>
       ${filterRow}
       <div class="empty">${filter==='done' ? 'Nog niets afgerond.' : 'Wachtrij is momenteel leeg.'}</div>
@@ -529,6 +547,7 @@ function queueWidgetHtml(result, baseline){
 
   return `<div class="card" id="queue-widget" style="margin-bottom:20px;">
     <h2>${ICONS.clock}Verwerkingswachtrij</h2>
+    ${etaLine}
     <p class="hint">${hint}</p>
     ${filterRow}
     <div class="log">${rows}</div>
