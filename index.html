@@ -483,19 +483,35 @@ let lastLoodsBaseline = { ...LOODS_CONFIG_DEFAULT };
 let queueTickInterval = null;
 let queueFilterMode = 'active'; // 'active' = bezig/nog beginnen (standaard) | 'done' = afgerond
 
-// planten die volgens de (gekalibreerde) wachtrij nu nog fysiek in de loods liggen.
-// let op: telt op BATCH-niveau (niet per inleg) — een grote inleg die over
-// meerdere batches loopt telt dus al gedeeltelijk mee zodra de eerste batches
-// ervan klaar zijn, niet pas als de hele inleg volledig afgerond is
-function plantenNogInLoods(result){
+// hoeveel zakjes er volgens de (gekalibreerde) wachtrij tot nu toe al ECHT
+// verwerkt zijn (site-breed, over iedereen heen) — telt op BATCH-niveau
+// (niet per inleg), dus een grote inleg die over meerdere batches loopt telt
+// al gedeeltelijk mee zodra de eerste batches ervan klaar zijn
+function verwerkteZakjesInQueue(result){
   const now = new Date();
+  return result.batches.filter(b => b.end <= now).reduce((s,b) => s + b.zakjes, 0);
+}
+// planten die volgens de wachtrij nu nog fysiek in de loods liggen (nog niet
+// door een batch verwerkt)
+function plantenNogInLoods(result){
   const totaalIngelegd = result.deposits.reduce((s,d) => s + d.amount, 0);
-  const verwerkteZakjes = result.batches.filter(b => b.end <= now).reduce((s,b) => s + b.zakjes, 0);
-  return Math.max(0, totaalIngelegd - verwerkteZakjes * RATIO_IN);
+  return Math.max(0, totaalIngelegd - verwerkteZakjesInQueue(result) * RATIO_IN);
+}
+// zakjes die al verwerkt zijn maar nog NIET opgehaald — dit is dus wat er nu
+// écht klaarligt in de loods om op te halen. Anders dan "nog tegoed" (dat is
+// instant toegekend bij inleg, los van de verwerkingstijd): dit cijfer houdt
+// wel rekening met de wachtrij-simulatie, en daalt zodra iemand ophaalt.
+function zakjesKlaarInLoods(result, totalOpgehaald){
+  return Math.max(0, verwerkteZakjesInQueue(result) - totalOpgehaald);
 }
 function updateLoodsStatTile(){
   const el = document.getElementById('stat-planten-loods');
   if(el) el.textContent = fmtNum(plantenNogInLoods(lastQueueResult));
+  const el2 = document.getElementById('stat-zakjes-in-loods');
+  if(el2){
+    const totalOpgehaald = cache.users.reduce((s,u) => s + u.opgehaald, 0);
+    el2.textContent = fmtNum(zakjesKlaarInLoods(lastQueueResult, totalOpgehaald));
+  }
 }
 
 function queueWidgetHtml(result, baseline){
@@ -1050,7 +1066,7 @@ function dashboardView(allInlegLog, baseline){
     ${navTabsHtml('loods')}
 
     <div class="who">
-      <div class="name"><button class="who-avatar-btn" data-edit-avatar="1" title="Profielfoto wijzigen">${avatarCircleHtml(me, 26)}</button>${escapeHtml(me.name)}<span><b class="tegoed">${myTegoed}</b> zakje${myTegoed===1?'':'s'} tegoed op dit moment</span></div>
+      <div class="name"><button class="who-avatar-btn" data-edit-avatar="1" title="Profielfoto wijzigen">${avatarCircleHtml(me, 26)}</button>${escapeHtml(me.name)}<span><b class="tegoed">${myTegoed}</b>&nbsp;zakje${myTegoed===1?'':'s'} tegoed op dit moment</span></div>
       <button class="btn secondary who-logout" data-logout="1">Uitloggen</button>
     </div>
 
@@ -1058,6 +1074,7 @@ function dashboardView(allInlegLog, baseline){
       <div class="t"><div class="n" id="stat-planten-loods">${fmtNum(plantenNogInLoods(queueResult))}</div><div class="l">planten in loods</div></div>
       <div class="t"><div class="n">${fmtNum(totalZakjesToegekend)}</div><div class="l">zakjes toegekend</div></div>
       <div class="t"><div class="n">${fmtNum(totalOpgehaald)}</div><div class="l">al opgehaald</div></div>
+      <div class="t"><div class="n" id="stat-zakjes-in-loods">${fmtNum(zakjesKlaarInLoods(queueResult, totalOpgehaald))}</div><div class="l">zakjes in loods</div></div>
       <div class="t"><div class="n tegoed">${fmtNum(totalZakjesToegekend - totalOpgehaald)}</div><div class="l">nog tegoed</div></div>
     </div>
 
