@@ -654,6 +654,27 @@ function closeMobileMenu(){
 }
 function fmtNum(n){ return Number(n).toLocaleString('nl-BE'); }
 
+// ---------- paginatie voor logboeken (25 per pagina) ----------
+const LOG_PAGE_SIZE = 25;
+const logPageState = {}; // key -> huidige paginanummer
+function getLogPage(key){ return logPageState[key] || 1; }
+function setLogPage(key, page){ logPageState[key] = Math.max(1, page); }
+function paginateList(list, key){
+  const totalPages = Math.max(1, Math.ceil(list.length / LOG_PAGE_SIZE));
+  const page = Math.min(getLogPage(key), totalPages);
+  setLogPage(key, page);
+  const start = (page - 1) * LOG_PAGE_SIZE;
+  return { pageItems: list.slice(start, start + LOG_PAGE_SIZE), page, totalPages };
+}
+function paginationHtml(key, page, totalPages){
+  if(totalPages <= 1) return '';
+  return `<div class="log-pagination" data-page-key="${key}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap;">
+    <button class="btn secondary small" data-page-action="prev" ${page<=1?'disabled':''}>&larr; Vorige</button>
+    <span style="font-size:11.5px;color:var(--muted);">Pagina ${page} / ${totalPages}</span>
+    <button class="btn secondary small" data-page-action="next" ${page>=totalPages?'disabled':''}>Volgende &rarr;</button>
+  </div>`;
+}
+
 // ---------- unieke kleur per persoon (herkenbaar in avatars/tabellen/log) ----------
 // Elke geregistreerde gebruiker krijgt een eigen plek (op volgorde van aansluiten),
 // en elke plek krijgt een kleurtint die met de gulden hoek gespreid is over het
@@ -1004,7 +1025,8 @@ function dashboardView(allInlegLog, baseline){
       </tr>`;
     }).join('');
 
-  const logEntries = cache.log.map(e => {
+  const dashLogPage = paginateList(cache.log, 'dashboard');
+  const logEntries = dashLogPage.pageItems.map(e => {
     if(e.type === 'inleg'){
       return `<div class="entry inleg">
         <div class="ts">${fmtTs(e.ts)}</div>
@@ -1075,9 +1097,10 @@ function dashboardView(allInlegLog, baseline){
       </table>
     </div>
 
-    <div class="section-title"><h2>${ICONS.list}Volledig logboek</h2><span>laatste ${cache.log.length} registraties</span></div>
+    <div class="section-title"><h2>${ICONS.list}Volledig logboek</h2><span>${cache.log.length} registraties (laatste 80 opgehaald)</span></div>
     <div class="card" style="padding:6px 20px;">
       <div class="log">${logEntries || '<div class="empty">Nog geen registraties.</div>'}</div>
+      ${paginationHtml('dashboard', dashLogPage.page, dashLogPage.totalPages)}
     </div>
 
     <footer class="note">
@@ -1142,7 +1165,8 @@ function klantenListView(){
 function klantDetailView(k, klantLog){
   const z = zakjesVoorKlant(k.total_geleverd);
 
-  const entries = klantLog.map(e => {
+  const klantLogPaged = paginateList(klantLog, `klant-${k.id}`);
+  const entries = klantLogPaged.pageItems.map(e => {
     return `<div class="entry levering">
       <div class="ts">${fmtTs(e.ts)}</div>
       <div class="desc">${e.amount} geleverd — ingevuld door ${personDot(e.by_user_name)}<b>${escapeHtml(e.by_user_name)}</b>
@@ -1184,6 +1208,7 @@ function klantDetailView(k, klantLog){
     <div class="section-title"><h2>${ICONS.list}Geschiedenis van ${escapeHtml(k.name)}</h2><span>${klantLog.length} registraties</span></div>
     <div class="card" style="padding:6px 20px;">
       <div class="log">${entries || '<div class="empty">Nog geen registraties voor deze klant.</div>'}</div>
+      ${paginationHtml(`klant-${k.id}`, klantLogPaged.page, klantLogPaged.totalPages)}
     </div>
   `;
 }
@@ -1447,7 +1472,8 @@ function attachBossLockedHandlers(){
   document.getElementById('boss-unlock').addEventListener('click', bossCodeModal);
 }
 
-let bossMerged = []; // laatst opgebouwde gefilterde logboek-lijst, voor de filter-dropdown
+let bossMerged = []; // laatst opgebouwde volledige logboek-lijst
+let bossPersonFilter = ''; // blijft staan over renders heen (leeg = iedereen)
 
 function bossLogEntriesHtml(list){
   if(!list.length) return '<div class="empty">Geen registraties.</div>';
@@ -1542,17 +1568,23 @@ function bossView(allLog, allCustLog, loodsBaseline){
       <div class="err" id="loods-baseline-err"></div>
     </div>
 
-    <div class="section-title"><h2>${ICONS.list}Volledig logboek</h2><span>${bossMerged.length} registraties</span></div>
+    ${(() => {
+      const filtered = bossPersonFilter ? bossMerged.filter(e => e.person === bossPersonFilter) : bossMerged;
+      const bossLogPaged = paginateList(filtered, 'boss');
+      return `
+    <div class="section-title"><h2>${ICONS.list}Volledig logboek</h2><span>${filtered.length} registraties</span></div>
     <div class="card">
       <label for="boss-filter">Filter op persoon</label>
       <select id="boss-filter" class="select-field">
-        <option value="">Iedereen</option>
-        ${persons.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('')}
+        <option value="" ${bossPersonFilter===''?'selected':''}>Iedereen</option>
+        ${persons.map(p => `<option value="${escapeHtml(p)}" ${bossPersonFilter===p?'selected':''}>${escapeHtml(p)}</option>`).join('')}
       </select>
     </div>
     <div class="card" style="padding:6px 20px;margin-top:16px;">
-      <div class="log" id="boss-log">${bossLogEntriesHtml(bossMerged)}</div>
-    </div>
+      <div class="log" id="boss-log">${bossLogEntriesHtml(bossLogPaged.pageItems)}</div>
+      ${paginationHtml('boss', bossLogPaged.page, bossLogPaged.totalPages)}
+    </div>`;
+    })()}
   `;
 }
 
@@ -1649,9 +1681,9 @@ function attachBossHandlers(){
   const filter = document.getElementById('boss-filter');
   if(filter){
     filter.addEventListener('change', () => {
-      const val = filter.value;
-      const filtered = val ? bossMerged.filter(e => e.person === val) : bossMerged;
-      document.getElementById('boss-log').innerHTML = bossLogEntriesHtml(filtered);
+      bossPersonFilter = filter.value;
+      setLogPage('boss', 1);
+      render();
     });
   }
 }
@@ -1672,6 +1704,14 @@ function attachLoginHandlers(){
 
 // ---------- event wiring: common (nav + logout) ----------
 function attachCommonHandlers(){
+  document.querySelectorAll('[data-page-action]').forEach(btn=>{
+    btn.addEventListener('click', () => {
+      const key = btn.closest('.log-pagination').getAttribute('data-page-key');
+      const cur = getLogPage(key);
+      setLogPage(key, btn.getAttribute('data-page-action') === 'next' ? cur + 1 : cur - 1);
+      render();
+    });
+  });
   document.querySelectorAll('[data-nav]').forEach(el=>{
     el.addEventListener('click', ()=> goTo(el.getAttribute('data-nav')));
   });
