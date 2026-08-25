@@ -1,0 +1,43 @@
+name: Discord-notificatie zakjes klaar
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # elke 5 minuten (GitHub best-effort, kan iets vertragen bij drukte)
+  workflow_dispatch: {}       # handmatig te starten via de Actions-tab, handig om te testen
+
+permissions:
+  contents: write
+
+concurrency:
+  group: discord-notify
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Europe/Brussels    # zelfde tijdzone als de website (browser-lokale tijd van de leden)
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check wachtrij en meld klare zakjes
+        run: node .github/scripts/discord-notify.mjs
+
+      - name: Bewaar meld-status
+        run: |
+          git add .github/state/discord-notified.json
+          if ! git diff --cached --quiet; then
+            git config user.name "wietloods-bot"
+            git config user.email "actions@github.com"
+            git commit -m "chore: discord meld-status bijwerken"
+            git push
+          else
+            echo "Geen wijziging in meld-status."
+          fi
