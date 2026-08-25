@@ -468,11 +468,14 @@ function computeQueueTimeline(log, batchSize, batchMinutes, offsetMinutes){
     const { start, end } = scheduleBatch(from, batchMinutes);
     freeAt = end;
     const byUser = {}; // hoeveel zakjes van deze batch per persoon — nodig voor per-profiel "momenteel"-cijfers
+    // sleutel op user_id (stabiel, ook na een naamswijziging), user_name is enkel fallback
+    // voor oude logregels van een intussen verwijderd profiel (user_id dan null)
     batch.forEach(u => {
-      const uname = deposits[u.depositIndex].user_name;
-      byUser[uname] = (byUser[uname] || 0) + 1;
+      const dep = deposits[u.depositIndex];
+      const ukey = dep.user_id || dep.user_name;
+      byUser[ukey] = (byUser[ukey] || 0) + 1;
       if(!perDeposit.has(u.depositIndex)){
-        perDeposit.set(u.depositIndex, { userName: uname, amount: deposits[u.depositIndex].amount, zakjes: 0, start, end });
+        perDeposit.set(u.depositIndex, { userName: dep.user_name, amount: dep.amount, zakjes: 0, start, end });
       }
       const d = perDeposit.get(u.depositIndex);
       d.zakjes += 1;
@@ -500,7 +503,7 @@ function verwerkteZakjesInQueue(result){
   const now = new Date();
   return result.batches.filter(b => b.end <= now).reduce((s,b) => s + b.zakjes, 0);
 }
-// zelfde telling, maar per persoon (userName -> aantal al verwerkte zakjes)
+// zelfde telling, maar per persoon (user_id -> aantal al verwerkte zakjes)
 function verwerkteZakjesPerPersoon(result){
   const now = new Date();
   const map = new Map();
@@ -536,10 +539,10 @@ function updateLoodsStatTile(){
   if(document.querySelector('[data-momenteel-inleg]')){
     const verwerktPerPersoon = verwerkteZakjesPerPersoon(lastQueueResult);
     cache.users.forEach(u => {
-      const verwerkt = verwerktPerPersoon.get(u.name) || 0;
-      const c1 = document.querySelector(`[data-momenteel-inleg="${CSS.escape(u.name)}"]`);
+      const verwerkt = verwerktPerPersoon.get(u.id) || 0;
+      const c1 = document.querySelector(`[data-momenteel-inleg="${u.id}"]`);
       if(c1) c1.textContent = fmtNum(Math.max(0, u.total_ingelegd - verwerkt * RATIO_IN));
-      const c2 = document.querySelector(`[data-momenteel-tegoed="${CSS.escape(u.name)}"]`);
+      const c2 = document.querySelector(`[data-momenteel-tegoed="${u.id}"]`);
       if(c2) c2.textContent = fmtNum(Math.max(0, verwerkt - u.opgehaald));
     });
   }
@@ -1064,16 +1067,16 @@ function dashboardView(allInlegLog, baseline){
     .map(u => {
       const z = zakjesVoor(u.total_ingelegd);
       const tegoed = z - u.opgehaald;
-      const verwerkt = verwerktPerPersoon.get(u.name) || 0;
+      const verwerkt = verwerktPerPersoon.get(u.id) || 0;
       const momenteelInleg = Math.max(0, u.total_ingelegd - verwerkt * RATIO_IN);
       const momenteelTegoed = Math.max(0, verwerkt - u.opgehaald);
       return `<tr class="${u.id===me.id?'me':''}">
         <td>${personDot(u.name)}${escapeHtml(u.name)}</td>
         <td class="num">${fmtNum(u.total_ingelegd)}</td>
-        <td class="num" data-momenteel-inleg="${escapeHtml(u.name)}">${fmtNum(momenteelInleg)}</td>
+        <td class="num" data-momenteel-inleg="${u.id}">${fmtNum(momenteelInleg)}</td>
         <td class="num">${fmtNum(z)}</td>
         <td class="num">${fmtNum(u.opgehaald)}</td>
-        <td class="num" data-momenteel-tegoed="${escapeHtml(u.name)}">${fmtNum(momenteelTegoed)}</td>
+        <td class="num" data-momenteel-tegoed="${u.id}">${fmtNum(momenteelTegoed)}</td>
         <td class="num tegoed">${fmtNum(tegoed)}</td>
       </tr>`;
     }).join('');
