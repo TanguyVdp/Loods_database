@@ -335,9 +335,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_pqkMMN1YXz8mMd56_92BUQ_jKSQCfWx";
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const RATIO_IN = 2, RATIO_OUT = 1;             // leden: 2 planten -> 1 zakje (na de loods-upgrade)
-const LEGACY_RATIO_IN = 3;                     // oude ratio vóór de upgrade — enkel gebruikt om te bepalen
-                                                // hoeveel planten iemands bevroren "legacy_zakjes" verbruikt hebben
+const RATIO_IN = 3, RATIO_OUT = 1;             // leden: 3 planten -> 1 zakje
 const KLANT_RATIO_IN = 4, KLANT_RATIO_OUT = 1; // klanten: 4 geleverd -> 1 zakje
 const MAX_USERS = 25;
 const SESSION_KEY = "loods25-session";
@@ -630,13 +628,7 @@ function startQueueTicker(){
   }, 20000);
 }
 
-// legacyZakjes ligt vast aan de OUDE ratio (3:1, van vóór de loods-upgrade);
-// alles daarbovenop (rest) telt aan de NIEUWE ratio (RATIO_IN, nu 2:1)
-function zakjesForTotal(legacyZakjes, totalIngelegd){
-  const rest = Math.max(0, totalIngelegd - legacyZakjes * LEGACY_RATIO_IN);
-  return legacyZakjes + Math.floor(rest / RATIO_IN) * RATIO_OUT;
-}
-function zakjesVoor(user){ return zakjesForTotal(user.legacy_zakjes || 0, user.total_ingelegd); }
+function zakjesVoor(totalIngelegd){ return Math.floor(totalIngelegd / RATIO_IN) * RATIO_OUT; }
 function zakjesVoorKlant(totalGeleverd){ return Math.floor(totalGeleverd / KLANT_RATIO_IN) * KLANT_RATIO_OUT; }
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1061,9 +1053,9 @@ function loginView(){
 function dashboardView(allInlegLog, baseline){
   const me = getUser(session);
   const totalIngelegd = cache.users.reduce((s,u)=>s+u.total_ingelegd,0);
-  const totalZakjesToegekend = cache.users.reduce((s,u)=>s+zakjesVoor(u),0);
+  const totalZakjesToegekend = cache.users.reduce((s,u)=>s+zakjesVoor(u.total_ingelegd),0);
   const totalOpgehaald = cache.users.reduce((s,u)=>s+u.opgehaald,0);
-  const myZakjes = zakjesVoor(me);
+  const myZakjes = zakjesVoor(me.total_ingelegd);
   const myTegoed = myZakjes - me.opgehaald;
 
   const queueResult = computeQueueTimeline(allInlegLog, baseline.batch_size, baseline.batch_minutes, baseline.offset_minutes);
@@ -1071,9 +1063,9 @@ function dashboardView(allInlegLog, baseline){
   lastLoodsBaseline = baseline;
 
   const verwerktPerPersoon = verwerkteZakjesPerPersoon(queueResult);
-  const rows = [...cache.users].sort((a,b)=> (zakjesVoor(b)-b.opgehaald) - (zakjesVoor(a)-a.opgehaald))
+  const rows = [...cache.users].sort((a,b)=> (zakjesVoor(b.total_ingelegd)-b.opgehaald) - (zakjesVoor(a.total_ingelegd)-a.opgehaald))
     .map(u => {
-      const z = zakjesVoor(u);
+      const z = zakjesVoor(u.total_ingelegd);
       const tegoed = z - u.opgehaald;
       const verwerkt = verwerktPerPersoon.get(u.id) || 0;
       const momenteelInleg = Math.max(0, u.total_ingelegd - verwerkt * RATIO_IN);
@@ -1867,8 +1859,8 @@ function attachDashboardHandlers(){
       if(!v || v <= 0){ preview.innerHTML=''; return; }
       const me = getUser(session);
       const newTotal = me.total_ingelegd + v;
-      const newZakjes = zakjesForTotal(me.legacy_zakjes || 0, newTotal);
-      const delta = newZakjes - zakjesVoor(me);
+      const newZakjes = zakjesVoor(newTotal);
+      const delta = newZakjes - zakjesVoor(me.total_ingelegd);
       preview.innerHTML = `Nieuw totaal: <b>${newTotal}</b> planten → jij krijgt er <b>+${delta}</b> zakje${delta===1?'':'s'} bij.`;
     });
     document.getElementById('in-submit').addEventListener('click', async () => {
