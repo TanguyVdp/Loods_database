@@ -1639,14 +1639,22 @@ function bossView(allLog, allCustLog, loodsBaseline){
     })
   ].sort((a,b) => new Date(b.ts) - new Date(a.ts));
 
+  const bossQueueResult = computeQueueTimeline(allLog, loodsBaseline.batch_size, loodsBaseline.batch_minutes, loodsBaseline.offset_minutes);
+  const bossVerwerktPerPersoon = verwerkteZakjesPerPersoon(bossQueueResult);
   const summary = persons.map(name => {
     const u = cache.users.find(x => x.name === name);
     const geleverd = allCustLog.filter(e => e.by_user_name === name).reduce((s,e)=>s+e.amount, 0);
+    const zakjes = u ? zakjesVoor(u.total_ingelegd) : 0;
+    const verwerkt = u ? (bossVerwerktPerPersoon.get(u.id) || 0) : 0;
     return {
       id: u ? u.id : null,
       name,
       ingelegd: u ? u.total_ingelegd : 0,
+      momenteelInleg: u ? momenteelInlegVoorPersoon(u, bossVerwerktPerPersoon) : 0,
+      zakjes,
       opgehaald: u ? u.opgehaald : 0,
+      momenteelTegoed: u ? Math.max(0, verwerkt - u.opgehaald) : 0,
+      tegoed: u ? zakjes - u.opgehaald : 0,
       geleverd,
       discordId: u ? u.discord_id : null
     };
@@ -1662,12 +1670,16 @@ function bossView(allLog, allCustLog, loodsBaseline){
     <div class="section-title"><h2>${ICONS.users}Overzicht per persoon</h2><span>${persons.length} leden — sleep om volgorde aan te passen</span></div>
     <div class="card" style="padding:14px 20px;">
       <table>
-        <thead><tr><th></th><th>Naam</th><th class="num">Ingelegd</th><th class="num">Opgehaald</th><th class="num">Geleverd aan klanten</th><th>Discord</th><th></th></tr></thead>
+        <thead><tr><th></th><th>Naam</th><th class="num">Ingelegd</th><th class="num">Momenteel inleg</th><th class="num">Totale zakjes</th><th class="num">Opgehaald</th><th class="num">Momenteel tegoed</th><th class="num">Tegoed</th><th class="num">Geleverd aan klanten</th><th>Discord</th><th></th></tr></thead>
         <tbody id="boss-summary-tbody">${summary.map(s => `<tr data-drag-id="${s.id || ''}">
           <td style="width:1%;">${s.id ? `<span class="drag-handle" data-drag-handle="1" title="Sleep om te herschikken">${ICONS.grip}</span>` : ''}</td>
           <td>${personDot(s.name)}${escapeHtml(s.name)}</td>
           <td class="num">${fmtNum(s.ingelegd)}</td>
+          <td class="num">${fmtNum(s.momenteelInleg)}</td>
+          <td class="num">${fmtNum(s.zakjes)}</td>
           <td class="num">${fmtNum(s.opgehaald)}</td>
+          <td class="num">${fmtNum(s.momenteelTegoed)}</td>
+          <td class="num tegoed">${fmtNum(s.tegoed)}</td>
           <td class="num">${fmtNum(s.geleverd)}</td>
           <td style="white-space:nowrap;">${s.id ? `
             ${s.discordId ? `<span class="mono" style="font-size:12px;color:var(--muted);margin-right:6px;">${escapeHtml(s.discordId)}</span>` : ''}
