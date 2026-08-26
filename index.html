@@ -1738,6 +1738,32 @@ function bossView(allLog, allCustLog, loodsBaseline){
       </table>
     </div>
 
+    <div class="section-title"><h2>${ICONS.sprout}Inleg/ophalen registreren voor een profiel</h2><span>enkel via Boss menu — kies eerst een profiel</span></div>
+    <div class="card" style="margin-bottom:20px;">
+      <label for="boss-reg-person">Profiel</label>
+      <select id="boss-reg-person" class="select-field" style="margin-bottom:16px;">
+        ${cache.users.map(u => `<option value="${u.id}">${escapeHtml(u.name)}</option>`).join('')}
+      </select>
+      <div class="grid2">
+        <div class="card">
+          <h2>${ICONS.sprout}Planten inleggen</h2>
+          <p class="hint" id="boss-reg-in-hint"></p>
+          <label for="boss-reg-in-amount">Aantal planten</label>
+          <input type="number" id="boss-reg-in-amount" min="1" step="1" placeholder="bv. 120">
+          <div style="margin-top:14px;"><button class="btn boss block" id="boss-reg-in-submit">Inleg registreren</button></div>
+          <div class="err" id="boss-reg-in-err"></div>
+        </div>
+        <div class="card">
+          <h2>${ICONS.arrowDown}Zakjes ophalen</h2>
+          <p class="hint" id="boss-reg-out-hint"></p>
+          <label for="boss-reg-out-amount">Aantal zakjes ophalen</label>
+          <input type="number" id="boss-reg-out-amount" min="1" step="1" placeholder="bv. 20">
+          <div style="margin-top:14px;"><button class="btn boss block" id="boss-reg-out-submit">Ophalen registreren</button></div>
+          <div class="err" id="boss-reg-out-err"></div>
+        </div>
+      </div>
+    </div>
+
     ${(() => {
       const filtered = bossPersonFilter ? bossMerged.filter(e => e.person === bossPersonFilter) : bossMerged;
       const bossLogPaged = paginateList(filtered, 'boss');
@@ -1968,6 +1994,45 @@ function attachBossHandlers(){
     });
   });
   attachRowDrag(document.getElementById('boss-summary-tbody'), saveBossOrder);
+
+  const regPersonSel = document.getElementById('boss-reg-person');
+  if(regPersonSel){
+    const updateRegHints = () => {
+      const u = cache.users.find(x => x.id === regPersonSel.value);
+      if(!u) return;
+      const z = zakjesVoor(u);
+      const tegoed = z - u.opgehaald;
+      document.getElementById('boss-reg-in-hint').innerHTML = `Wordt opgeteld bij ${escapeHtml(u.name)}'s totaal (${fmtNum(u.total_ingelegd)} nu) — elke ${RATIO_IN} planten leveren ${RATIO_OUT} zakje op.`;
+      document.getElementById('boss-reg-out-hint').innerHTML = `${escapeHtml(u.name)} heeft nu <b class="mono" style="color:var(--lime)">${fmtNum(tegoed)}</b> zakje${tegoed===1?'':'s'} tegoed.`;
+    };
+    updateRegHints();
+    regPersonSel.addEventListener('change', updateRegHints);
+
+    document.getElementById('boss-reg-in-submit').addEventListener('click', async () => {
+      const uid = regPersonSel.value;
+      const v = parseInt(document.getElementById('boss-reg-in-amount').value, 10);
+      const err = document.getElementById('boss-reg-in-err');
+      if(!v || v <= 0){ err.textContent = 'Voer een geldig aantal planten in.'; return; }
+      const { error } = await sb.rpc('fn_register_inleg', { p_user_id: uid, p_amount: v });
+      if(error){ err.textContent = friendlyError(error); return; }
+      const u = cache.users.find(x => x.id === uid);
+      showToast(`Inleg geregistreerd voor ${u ? u.name : ''}: +${v} planten.`);
+      render();
+    });
+
+    document.getElementById('boss-reg-out-submit').addEventListener('click', async () => {
+      const uid = regPersonSel.value;
+      const v = parseInt(document.getElementById('boss-reg-out-amount').value, 10);
+      const err = document.getElementById('boss-reg-out-err');
+      if(!v || v <= 0){ err.textContent = 'Voer een geldig aantal zakjes in.'; return; }
+      const { error } = await sb.rpc('fn_register_ophalen', { p_user_id: uid, p_amount: v });
+      if(error){ err.textContent = friendlyError(error); return; }
+      const u = cache.users.find(x => x.id === uid);
+      showToast(`Opgehaald voor ${u ? u.name : ''}: ${v} zakje${v===1?'':'s'}.`);
+      render();
+    });
+  }
+
   const filter = document.getElementById('boss-filter');
   if(filter){
     filter.addEventListener('change', () => {
