@@ -220,6 +220,7 @@ tr.dragging{opacity:0.45;background:var(--surface-hi);}
 .entry .delta{font-family:'Space Mono',monospace;font-weight:700;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums;}
 .entry.inleg .delta,.entry.levering .delta{color:var(--lime);}
 .entry.ophalen .delta{color:var(--warn);}
+.entry.correctie .delta{color:var(--muted);}
 .empty{color:var(--muted-dim);font-size:12.5px;padding:26px 0;text-align:center;}
 
 .back-link{color:var(--muted);font-size:12px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;
@@ -335,12 +336,9 @@ const SUPABASE_ANON_KEY = "sb_publishable_pqkMMN1YXz8mMd56_92BUQ_jKSQCfWx";
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const RATIO_IN = 3, RATIO_OUT = 1;             // leden: 3 planten -> 1 zakje
-// bij een toekomstige ratio-wijziging (bv. de loods-upgrade) wordt RATIO_IN
-// aangepast en legt een migratie legacy_zakjes vast per persoon; deze
-// constante blijft de OUDE ratio waarmee dat bevroren legacy-deel al
-// verwerkt was. Zolang er nog geen wijziging is (legacy_zakjes = 0 voor
-// iedereen) heeft ze geen effect.
+const RATIO_IN = 3, RATIO_OUT = 1;             // leden: 3 planten -> 1 zakje (blijft zo tot de loods leeg is)
+// legacy_zakjes (per persoon, bevroren bij de upgrade) is verwerkt aan de
+// OUDE ratio — deze constante blijft die oude waarde, los van RATIO_IN.
 const LEGACY_RATIO_IN = 3;
 const KLANT_RATIO_IN = 4, KLANT_RATIO_OUT = 1; // klanten: 4 geleverd -> 1 zakje
 const MAX_USERS = 25;
@@ -364,7 +362,8 @@ const LOODS_CONFIG_DEFAULT = {
   batch_minutes: 3,
   set_by: null,
   paused: false,
-  paused_at: null
+  paused_at: null,
+  ratio_cutover_at: null
 };
 async function fetchLoodsBaseline(){
   const { data, error } = await sb.from('loods_baseline').select('*').eq('id', true).maybeSingle();
@@ -498,6 +497,36 @@ function computeQueueTimeline(log, batchSize, batchMinutes, offsetMinutes){
   return { deposits: [...perDeposit.values()], batches: batchResults };
 }
 
+// bouwt een "getrimde" versie van het logboek voor de wachtrij-simulatie:
+// het bevroren legacy-deel van iedereen (al verwerkt vóór de laatste
+// ratio-omschakeling, cutoverAtIso) wordt eruit gehaald — dat ligt al vast
+// in user.legacy_zakjes en hoeft niet nog eens gesimuleerd te worden. Van
+// elke inleg die nog (gedeeltelijk) na de cutover valt, blijft enkel het
+// overschot over, herberekend in zakjes-eenheden aan de HUIDIGE ratio i.p.v.
+// de historische zakjes_delta (die was berekend aan de ratio van tóen).
+// Zonder cutoverAtIso (nog geen migratie gebeurd) wordt het log ongewijzigd
+// doorgegeven.
+function buildPostCutoverLog(fullLog, users, cutoverAtIso){
+  if(!cutoverAtIso) return fullLog;
+  const cutoverAt = new Date(cutoverAtIso);
+  const legacyLeft = new Map(users.map(u => [u.id, (u.legacy_zakjes || 0) * LEGACY_RATIO_IN]));
+  const deposits = fullLog.filter(e => e.type === 'inleg' && e.zakjes_delta > 0)
+    .slice().sort((a,b) => new Date(a.ts) - new Date(b.ts));
+  const trimmed = [];
+  deposits.forEach(d => {
+    const left = legacyLeft.has(d.user_id) ? legacyLeft.get(d.user_id) : 0;
+    const consumed = Math.min(d.amount, left);
+    if(legacyLeft.has(d.user_id)) legacyLeft.set(d.user_id, left - consumed);
+    const remainingAmount = d.amount - consumed;
+    if(remainingAmount <= 0) return; // volledig legacy -> weglaten uit de simulatie
+    const remainingZakjes = Math.floor(remainingAmount / RATIO_IN);
+    if(remainingZakjes <= 0) return;
+    const ts = new Date(d.ts) < cutoverAt ? cutoverAt.toISOString() : d.ts;
+    trimmed.push({ ...d, amount: remainingAmount, zakjes_delta: remainingZakjes, ts });
+  });
+  return trimmed;
+}
+
 let lastQueueResult = { deposits: [], batches: [] };
 let lastLoodsBaseline = { ...LOODS_CONFIG_DEFAULT };
 let queueTickInterval = null;
@@ -513,15 +542,21 @@ function nowForQueue(){
   return new Date();
 }
 
-// hoeveel zakjes er volgens de (gekalibreerde) wachtrij tot nu toe al ECHT
-// verwerkt zijn (site-breed, over iedereen heen) — telt op BATCH-niveau
-// (niet per inleg), dus een grote inleg die over meerdere batches loopt telt
-// al gedeeltelijk mee zodra de eerste batches ervan klaar zijn
+// LET OP — sinds de invoering van legacy_zakjes bevat "result" hier enkel nog
+// de NA-CUTOVER wachtrij (zie buildPostCutoverLog): het legacy-deel (al
+// verwerkt vóór de ratio-omschakeling) zit er bewust NIET in, dat ligt al
+// vast in user.legacy_zakjes. "verwerkt" in de functies hieronder betekent
+// dus telkens "hoeveel van het NIEUWE (na-cutover) deel is al verwerkt" —
+// niet het totaal. Waar het totaal nodig is, wordt legacy_zakjes er expliciet
+// bijgeteld.
+
+// hoeveel zakjes er van het NA-CUTOVER deel van de wachtrij tot nu toe al
+// verwerkt zijn (site-breed) — telt op BATCH-niveau (niet per inleg)
 function verwerkteZakjesInQueue(result){
   const now = nowForQueue();
   return result.batches.filter(b => b.end <= now).reduce((s,b) => s + b.zakjes, 0);
 }
-// zelfde telling, maar per persoon (user_id -> aantal al verwerkte zakjes)
+// zelfde telling, maar per persoon (user_id -> aantal na-cutover al verwerkte zakjes)
 function verwerkteZakjesPerPersoon(result){
   const now = nowForQueue();
   const map = new Map();
@@ -532,54 +567,46 @@ function verwerkteZakjesPerPersoon(result){
   });
   return map;
 }
-// exact aantal planten dat de wachtrij tot nu toe verbruikt heeft om
-// "verwerkteZakjes" te produceren voor iemand — houdt rekening met de
-// bevroren legacy_zakjes (oude 3:1-ratio, van vóór een ratio-wijziging):
-// het legacy-deel gebruikt LEGACY_RATIO_IN, alles daarboven de huidige RATIO_IN.
-// Zo blijft dit exact kloppen ook al is de queue zelf ratio-agnostisch
-// (die telt enkel zakjes-eenheden, niet welke ratio ze geproduceerd heeft).
-function plantenVerwerkt(verwerkteZakjes, legacyZakjes){
-  const viaLegacy = Math.min(verwerkteZakjes, legacyZakjes) * LEGACY_RATIO_IN;
-  const viaNieuw = Math.max(0, verwerkteZakjes - legacyZakjes) * RATIO_IN;
-  return viaLegacy + viaNieuw;
+// totaal aantal zakjes dat voor iemand OOIT verwerkt is: het bevroren
+// legacy-deel (oude ratio) + wat er sinds de omschakeling zelf al verwerkt is
+function totaalVerwerktVoorPersoon(user, verwerktPerPersoon){
+  return (user.legacy_zakjes || 0) + (verwerktPerPersoon.get(user.id) || 0);
 }
-// planten die voor één persoon nog niet door de wachtrij verwerkt zijn
+// planten die voor één persoon nog niet door de wachtrij verwerkt zijn:
+// totaal ingelegd min wat er al "verbruikt" is — het legacy-deel aan de oude
+// ratio, het na-cutover-deel aan de huidige (nieuwe) ratio
 function momenteelInlegVoorPersoon(user, verwerktPerPersoon){
   const verwerkt = verwerktPerPersoon.get(user.id) || 0;
-  const verwerktPlanten = plantenVerwerkt(verwerkt, user.legacy_zakjes || 0);
+  const verwerktPlanten = (user.legacy_zakjes || 0) * LEGACY_RATIO_IN + verwerkt * RATIO_IN;
   return Math.max(0, user.total_ingelegd - verwerktPlanten);
 }
 // planten die volgens de wachtrij nu nog fysiek in de loods liggen (nog niet
-// door een batch verwerkt) — site-breed, som van alle personen (elk met hun
-// eigen legacy_zakjes, dus exact ook bij een mix van oude/nieuwe ratio)
+// door een batch verwerkt) — site-breed, som van alle personen
 function plantenNogInLoods(result, users){
   const verwerktPerPersoon = verwerkteZakjesPerPersoon(result);
   return users.reduce((s,u) => s + momenteelInlegVoorPersoon(u, verwerktPerPersoon), 0);
 }
-// zakjes die al verwerkt zijn maar nog NIET opgehaald — dit is dus wat er nu
-// écht klaarligt in de loods om op te halen. Anders dan "nog tegoed" (dat is
-// instant toegekend bij inleg, los van de verwerkingstijd): dit cijfer houdt
-// wel rekening met de wachtrij-simulatie, en daalt zodra iemand ophaalt.
-function zakjesKlaarInLoods(result, totalOpgehaald){
-  return Math.max(0, verwerkteZakjesInQueue(result) - totalOpgehaald);
+// zakjes die al verwerkt zijn (legacy + na-cutover) maar nog NIET opgehaald —
+// dit is dus wat er nu écht klaarligt om op te halen. Anders dan "nog tegoed"
+// (instant toegekend bij inleg, los van verwerkingstijd): dit houdt wel
+// rekening met de wachtrij-simulatie, en daalt zodra iemand ophaalt.
+function zakjesKlaarInLoods(result, users){
+  const verwerktPerPersoon = verwerkteZakjesPerPersoon(result);
+  return users.reduce((s,u) => s + Math.max(0, totaalVerwerktVoorPersoon(u, verwerktPerPersoon) - u.opgehaald), 0);
 }
 function updateLoodsStatTile(){
   const el = document.getElementById('stat-planten-loods');
   if(el) el.textContent = fmtNum(plantenNogInLoods(lastQueueResult, cache.users));
   const el2 = document.getElementById('stat-zakjes-in-loods');
-  if(el2){
-    const totalOpgehaald = cache.users.reduce((s,u) => s + u.opgehaald, 0);
-    el2.textContent = fmtNum(zakjesKlaarInLoods(lastQueueResult, totalOpgehaald));
-  }
+  if(el2) el2.textContent = fmtNum(zakjesKlaarInLoods(lastQueueResult, cache.users));
   // per-profiel "momenteel inleg" / "momenteel tegoed" kolommen, indien de tabel op het scherm staat
   if(document.querySelector('[data-momenteel-inleg]')){
     const verwerktPerPersoon = verwerkteZakjesPerPersoon(lastQueueResult);
     cache.users.forEach(u => {
-      const verwerkt = verwerktPerPersoon.get(u.id) || 0;
       const c1 = document.querySelector(`[data-momenteel-inleg="${u.id}"]`);
       if(c1) c1.textContent = fmtNum(momenteelInlegVoorPersoon(u, verwerktPerPersoon));
       const c2 = document.querySelector(`[data-momenteel-tegoed="${u.id}"]`);
-      if(c2) c2.textContent = fmtNum(Math.max(0, verwerkt - u.opgehaald));
+      if(c2) c2.textContent = fmtNum(Math.max(0, totaalVerwerktVoorPersoon(u, verwerktPerPersoon) - u.opgehaald));
     });
   }
 }
@@ -667,7 +694,13 @@ function startQueueTicker(){
   }, 20000);
 }
 
-function zakjesVoor(totalIngelegd){ return Math.floor(totalIngelegd / RATIO_IN) * RATIO_OUT; }
+// legacyZakjes ligt vast aan LEGACY_RATIO_IN (oude ratio); alles daarbovenop
+// (rest) telt aan de huidige RATIO_IN (nieuwe ratio)
+function zakjesForTotal(legacyZakjes, totalIngelegd){
+  const rest = Math.max(0, totalIngelegd - legacyZakjes * LEGACY_RATIO_IN);
+  return legacyZakjes + Math.floor(rest / RATIO_IN) * RATIO_OUT;
+}
+function zakjesVoor(user){ return zakjesForTotal(user.legacy_zakjes || 0, user.total_ingelegd); }
 function zakjesVoorKlant(totalGeleverd){ return Math.floor(totalGeleverd / KLANT_RATIO_IN) * KLANT_RATIO_OUT; }
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1092,23 +1125,22 @@ function loginView(){
 function dashboardView(allInlegLog, baseline){
   const me = getUser(session);
   const totalIngelegd = cache.users.reduce((s,u)=>s+u.total_ingelegd,0);
-  const totalZakjesToegekend = cache.users.reduce((s,u)=>s+zakjesVoor(u.total_ingelegd),0);
+  const totalZakjesToegekend = cache.users.reduce((s,u)=>s+zakjesVoor(u),0);
   const totalOpgehaald = cache.users.reduce((s,u)=>s+u.opgehaald,0);
-  const myZakjes = zakjesVoor(me.total_ingelegd);
+  const myZakjes = zakjesVoor(me);
   const myTegoed = myZakjes - me.opgehaald;
 
-  const queueResult = computeQueueTimeline(allInlegLog, baseline.batch_size, baseline.batch_minutes, baseline.offset_minutes);
+  const queueResult = computeQueueTimeline(buildPostCutoverLog(allInlegLog, cache.users, baseline.ratio_cutover_at), baseline.batch_size, baseline.batch_minutes, baseline.offset_minutes);
   lastQueueResult = queueResult;
   lastLoodsBaseline = baseline;
 
   const verwerktPerPersoon = verwerkteZakjesPerPersoon(queueResult);
-  const rows = [...cache.users].sort((a,b)=> (zakjesVoor(b.total_ingelegd)-b.opgehaald) - (zakjesVoor(a.total_ingelegd)-a.opgehaald))
+  const rows = [...cache.users].sort((a,b)=> (zakjesVoor(b)-b.opgehaald) - (zakjesVoor(a)-a.opgehaald))
     .map(u => {
-      const z = zakjesVoor(u.total_ingelegd);
+      const z = zakjesVoor(u);
       const tegoed = z - u.opgehaald;
-      const verwerkt = verwerktPerPersoon.get(u.id) || 0;
       const momenteelInleg = momenteelInlegVoorPersoon(u, verwerktPerPersoon);
-      const momenteelTegoed = Math.max(0, verwerkt - u.opgehaald);
+      const momenteelTegoed = Math.max(0, totaalVerwerktVoorPersoon(u, verwerktPerPersoon) - u.opgehaald);
       return `<tr class="${u.id===me.id?'me':''}">
         <td>${personDot(u.name)}${escapeHtml(u.name)}</td>
         <td class="num">${fmtNum(u.total_ingelegd)}</td>
@@ -1129,6 +1161,15 @@ function dashboardView(allInlegLog, baseline){
           <span class="sub">totaal ${e.cumulative_after} planten · zakjes toegekend: ${e.zakjes_after}</span>
         </div>
         <div class="delta">+${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'}</div>
+      </div>`;
+    }
+    if(e.type === 'correctie'){
+      return `<div class="entry correctie">
+        <div class="ts">${fmtTs(e.ts)}</div>
+        <div class="desc">${personDot(e.user_name)}<b>${escapeHtml(e.user_name)}</b> — profiel gecorrigeerd door Boss
+          <span class="sub">${escapeHtml(e.note || '')}</span>
+        </div>
+        <div class="delta">✎</div>
       </div>`;
     }
     return `<div class="entry ophalen">
@@ -1153,7 +1194,7 @@ function dashboardView(allInlegLog, baseline){
       <div class="t"><div class="n" id="stat-planten-loods">${fmtNum(plantenNogInLoods(queueResult, cache.users))}</div><div class="l">planten in loods</div></div>
       <div class="t"><div class="n">${fmtNum(totalZakjesToegekend)}</div><div class="l">zakjes toegekend</div></div>
       <div class="t"><div class="n">${fmtNum(totalOpgehaald)}</div><div class="l">al opgehaald</div></div>
-      <div class="t"><div class="n" id="stat-zakjes-in-loods">${fmtNum(zakjesKlaarInLoods(queueResult, totalOpgehaald))}</div><div class="l">zakjes in loods</div></div>
+      <div class="t"><div class="n" id="stat-zakjes-in-loods">${fmtNum(zakjesKlaarInLoods(queueResult, cache.users))}</div><div class="l">zakjes in loods</div></div>
       <div class="t"><div class="n tegoed">${fmtNum(totalZakjesToegekend - totalOpgehaald)}</div><div class="l">nog tegoed</div></div>
     </div>
 
@@ -1627,8 +1668,10 @@ function bossView(allLog, allCustLog, loodsBaseline){
       ts: e.ts, person: e.user_name, cls: e.type,
       label: e.type === 'inleg'
         ? `legde ${e.amount} planten in <span class="sub">totaal ${e.cumulative_after} · zakjes toegekend: ${e.zakjes_after}</span>`
-        : `haalde ${e.amount} zakje${e.amount===1?'':'s'} op <span class="sub">resterend tegoed: ${e.tegoed_after}</span>`,
-      delta: e.type === 'inleg' ? `+${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'}` : `−${e.amount} zakje${e.amount===1?'':'s'}`
+        : e.type === 'correctie'
+          ? `profiel gecorrigeerd door Boss <span class="sub">${escapeHtml(e.note || '')}</span>`
+          : `haalde ${e.amount} zakje${e.amount===1?'':'s'} op <span class="sub">resterend tegoed: ${e.tegoed_after}</span>`,
+      delta: e.type === 'inleg' ? `+${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'}` : e.type === 'correctie' ? '✎' : `−${e.amount} zakje${e.amount===1?'':'s'}`
     })),
     ...allCustLog.map(e => {
       const klant = getKlant(e.customer_id);
@@ -1640,13 +1683,12 @@ function bossView(allLog, allCustLog, loodsBaseline){
     })
   ].sort((a,b) => new Date(b.ts) - new Date(a.ts));
 
-  const bossQueueResult = computeQueueTimeline(allLog, loodsBaseline.batch_size, loodsBaseline.batch_minutes, loodsBaseline.offset_minutes);
+  const bossQueueResult = computeQueueTimeline(buildPostCutoverLog(allLog, cache.users, loodsBaseline.ratio_cutover_at), loodsBaseline.batch_size, loodsBaseline.batch_minutes, loodsBaseline.offset_minutes);
   const bossVerwerktPerPersoon = verwerkteZakjesPerPersoon(bossQueueResult);
   const summary = persons.map(name => {
     const u = cache.users.find(x => x.name === name);
     const geleverd = allCustLog.filter(e => e.by_user_name === name).reduce((s,e)=>s+e.amount, 0);
-    const zakjes = u ? zakjesVoor(u.total_ingelegd) : 0;
-    const verwerkt = u ? (bossVerwerktPerPersoon.get(u.id) || 0) : 0;
+    const zakjes = u ? zakjesVoor(u) : 0;
     return {
       id: u ? u.id : null,
       name,
@@ -1654,10 +1696,11 @@ function bossView(allLog, allCustLog, loodsBaseline){
       momenteelInleg: u ? momenteelInlegVoorPersoon(u, bossVerwerktPerPersoon) : 0,
       zakjes,
       opgehaald: u ? u.opgehaald : 0,
-      momenteelTegoed: u ? Math.max(0, verwerkt - u.opgehaald) : 0,
+      momenteelTegoed: u ? Math.max(0, totaalVerwerktVoorPersoon(u, bossVerwerktPerPersoon) - u.opgehaald) : 0,
       tegoed: u ? zakjes - u.opgehaald : 0,
       geleverd,
-      discordId: u ? u.discord_id : null
+      discordId: u ? u.discord_id : null,
+      legacyZakjes: u ? (u.legacy_zakjes || 0) : 0
     };
   });
 
@@ -1687,6 +1730,7 @@ function bossView(allLog, allCustLog, loodsBaseline){
             <button class="btn secondary small" data-edit-discord="${s.id}" data-discord-name="${escapeHtml(s.name)}" data-discord-current="${escapeHtml(s.discordId || '')}">${ICONS.gear}${s.discordId ? 'Wijzig' : 'Koppelen'}</button>
           ` : ''}</td>
           <td style="text-align:right;white-space:nowrap;">${s.id ? `
+            <button class="btn secondary small" data-edit-userdata="${s.id}" data-edit-name="${escapeHtml(s.name)}" data-edit-ingelegd="${s.ingelegd}" data-edit-opgehaald="${s.opgehaald}" data-edit-legacy="${s.legacyZakjes}" style="margin-right:6px;">${ICONS.gear}Bewerken</button>
             <button class="btn secondary small" data-reset-pin="${s.id}" data-reset-name="${escapeHtml(s.name)}" style="margin-right:6px;">${ICONS.lock}Code resetten</button>
             <button class="btn danger small" data-del-profile="${s.id}" data-del-name="${escapeHtml(s.name)}">${ICONS.trash}Verwijderen</button>
           ` : ''}</td>
@@ -1755,6 +1799,45 @@ function discordIdModal(userId, userName, current){
     }
     closeModal();
     showToast(val ? `Discord gekoppeld aan ${userName}.` : `Discord-koppeling van ${userName} verwijderd.`);
+    render();
+  };
+}
+
+function editUserDataModal(userId, userName, curIngelegd, curOpgehaald, curLegacy){
+  showModal(`<div class="modal">
+    <h3>Profiel bewerken — ${escapeHtml(userName)}</h3>
+    <p class="hint">Overschrijft deze waarden rechtstreeks — gebruik dit enkel voor correcties. De wijziging wordt gelogd in het logboek zodat er een spoor van blijft.</p>
+    <label for="euD-ingelegd">Ingelegd (totaal planten)</label>
+    <input type="number" id="euD-ingelegd" min="0" value="${curIngelegd}">
+    <label for="euD-opgehaald">Opgehaald (zakjes)</label>
+    <input type="number" id="euD-opgehaald" min="0" value="${curOpgehaald}">
+    <label for="euD-legacy">Legacy zakjes (bevroren aan oude ratio, na een ratio-wijziging)</label>
+    <input type="number" id="euD-legacy" min="0" value="${curLegacy}">
+    <div class="err" id="euD-err"></div>
+    <div class="row-btns">
+      <button class="btn secondary" id="euD-cancel" style="flex:1">Annuleren</button>
+      <button class="btn boss" id="euD-ok" style="flex:1">Opslaan</button>
+    </div>
+  </div>`);
+  document.getElementById('euD-cancel').onclick = closeModal;
+  document.getElementById('euD-ok').onclick = async () => {
+    const ingelegd = parseInt(document.getElementById('euD-ingelegd').value, 10);
+    const opgehaald = parseInt(document.getElementById('euD-opgehaald').value, 10);
+    const legacy = parseInt(document.getElementById('euD-legacy').value, 10);
+    const err = document.getElementById('euD-err');
+    if(isNaN(ingelegd) || ingelegd < 0 || isNaN(opgehaald) || opgehaald < 0 || isNaN(legacy) || legacy < 0){
+      err.textContent = 'Voer overal een geldig getal (0 of meer) in.'; return;
+    }
+    const btn = document.getElementById('euD-ok');
+    btn.disabled = true; btn.textContent = 'Bezig…';
+    const me = getUser(session);
+    const { error } = await sb.rpc('fn_boss_set_user_data', {
+      p_user_id: userId, p_total_ingelegd: ingelegd, p_opgehaald: opgehaald, p_legacy_zakjes: legacy,
+      p_boss_pin_hash: bossPinHash(), p_set_by: me ? me.name : null
+    });
+    if(error){ err.textContent = friendlyError(error); btn.disabled = false; btn.textContent = 'Opslaan'; return; }
+    closeModal();
+    showToast(`Profiel van ${userName} bijgewerkt.`);
     render();
   };
 }
@@ -1875,6 +1958,15 @@ function attachBossHandlers(){
       discordIdModal(el.getAttribute('data-edit-discord'), el.getAttribute('data-discord-name'), el.getAttribute('data-discord-current'));
     });
   });
+  document.querySelectorAll('[data-edit-userdata]').forEach(el=>{
+    el.addEventListener('click', () => {
+      editUserDataModal(
+        el.getAttribute('data-edit-userdata'), el.getAttribute('data-edit-name'),
+        parseInt(el.getAttribute('data-edit-ingelegd'), 10), parseInt(el.getAttribute('data-edit-opgehaald'), 10),
+        parseInt(el.getAttribute('data-edit-legacy'), 10)
+      );
+    });
+  });
   attachRowDrag(document.getElementById('boss-summary-tbody'), saveBossOrder);
   const filter = document.getElementById('boss-filter');
   if(filter){
@@ -1969,8 +2061,8 @@ function attachDashboardHandlers(){
       if(!v || v <= 0){ preview.innerHTML=''; return; }
       const me = getUser(session);
       const newTotal = me.total_ingelegd + v;
-      const newZakjes = zakjesVoor(newTotal);
-      const delta = newZakjes - zakjesVoor(me.total_ingelegd);
+      const newZakjes = zakjesForTotal(me.legacy_zakjes || 0, newTotal);
+      const delta = newZakjes - zakjesVoor(me);
       preview.innerHTML = `Nieuw totaal: <b>${newTotal}</b> planten → jij krijgt er <b>+${delta}</b> zakje${delta===1?'':'s'} bij.`;
     });
     document.getElementById('in-submit').addEventListener('click', async () => {
