@@ -336,6 +336,12 @@ const SUPABASE_ANON_KEY = "sb_publishable_pqkMMN1YXz8mMd56_92BUQ_jKSQCfWx";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const RATIO_IN = 3, RATIO_OUT = 1;             // leden: 3 planten -> 1 zakje
+// bij een toekomstige ratio-wijziging (bv. de loods-upgrade) wordt RATIO_IN
+// aangepast en legt een migratie legacy_zakjes vast per persoon; deze
+// constante blijft de OUDE ratio waarmee dat bevroren legacy-deel al
+// verwerkt was. Zolang er nog geen wijziging is (legacy_zakjes = 0 voor
+// iedereen) heeft ze geen effect.
+const LEGACY_RATIO_IN = 3;
 const KLANT_RATIO_IN = 4, KLANT_RATIO_OUT = 1; // klanten: 4 geleverd -> 1 zakje
 const MAX_USERS = 25;
 const SESSION_KEY = "loods25-session";
@@ -526,11 +532,29 @@ function verwerkteZakjesPerPersoon(result){
   });
   return map;
 }
+// exact aantal planten dat de wachtrij tot nu toe verbruikt heeft om
+// "verwerkteZakjes" te produceren voor iemand — houdt rekening met de
+// bevroren legacy_zakjes (oude 3:1-ratio, van vóór een ratio-wijziging):
+// het legacy-deel gebruikt LEGACY_RATIO_IN, alles daarboven de huidige RATIO_IN.
+// Zo blijft dit exact kloppen ook al is de queue zelf ratio-agnostisch
+// (die telt enkel zakjes-eenheden, niet welke ratio ze geproduceerd heeft).
+function plantenVerwerkt(verwerkteZakjes, legacyZakjes){
+  const viaLegacy = Math.min(verwerkteZakjes, legacyZakjes) * LEGACY_RATIO_IN;
+  const viaNieuw = Math.max(0, verwerkteZakjes - legacyZakjes) * RATIO_IN;
+  return viaLegacy + viaNieuw;
+}
+// planten die voor één persoon nog niet door de wachtrij verwerkt zijn
+function momenteelInlegVoorPersoon(user, verwerktPerPersoon){
+  const verwerkt = verwerktPerPersoon.get(user.id) || 0;
+  const verwerktPlanten = plantenVerwerkt(verwerkt, user.legacy_zakjes || 0);
+  return Math.max(0, user.total_ingelegd - verwerktPlanten);
+}
 // planten die volgens de wachtrij nu nog fysiek in de loods liggen (nog niet
-// door een batch verwerkt)
-function plantenNogInLoods(result){
-  const totaalIngelegd = result.deposits.reduce((s,d) => s + d.amount, 0);
-  return Math.max(0, totaalIngelegd - verwerkteZakjesInQueue(result) * RATIO_IN);
+// door een batch verwerkt) — site-breed, som van alle personen (elk met hun
+// eigen legacy_zakjes, dus exact ook bij een mix van oude/nieuwe ratio)
+function plantenNogInLoods(result, users){
+  const verwerktPerPersoon = verwerkteZakjesPerPersoon(result);
+  return users.reduce((s,u) => s + momenteelInlegVoorPersoon(u, verwerktPerPersoon), 0);
 }
 // zakjes die al verwerkt zijn maar nog NIET opgehaald — dit is dus wat er nu
 // écht klaarligt in de loods om op te halen. Anders dan "nog tegoed" (dat is
@@ -541,7 +565,7 @@ function zakjesKlaarInLoods(result, totalOpgehaald){
 }
 function updateLoodsStatTile(){
   const el = document.getElementById('stat-planten-loods');
-  if(el) el.textContent = fmtNum(plantenNogInLoods(lastQueueResult));
+  if(el) el.textContent = fmtNum(plantenNogInLoods(lastQueueResult, cache.users));
   const el2 = document.getElementById('stat-zakjes-in-loods');
   if(el2){
     const totalOpgehaald = cache.users.reduce((s,u) => s + u.opgehaald, 0);
@@ -553,7 +577,7 @@ function updateLoodsStatTile(){
     cache.users.forEach(u => {
       const verwerkt = verwerktPerPersoon.get(u.id) || 0;
       const c1 = document.querySelector(`[data-momenteel-inleg="${u.id}"]`);
-      if(c1) c1.textContent = fmtNum(Math.max(0, u.total_ingelegd - verwerkt * RATIO_IN));
+      if(c1) c1.textContent = fmtNum(momenteelInlegVoorPersoon(u, verwerktPerPersoon));
       const c2 = document.querySelector(`[data-momenteel-tegoed="${u.id}"]`);
       if(c2) c2.textContent = fmtNum(Math.max(0, verwerkt - u.opgehaald));
     });
@@ -1083,7 +1107,7 @@ function dashboardView(allInlegLog, baseline){
       const z = zakjesVoor(u.total_ingelegd);
       const tegoed = z - u.opgehaald;
       const verwerkt = verwerktPerPersoon.get(u.id) || 0;
-      const momenteelInleg = Math.max(0, u.total_ingelegd - verwerkt * RATIO_IN);
+      const momenteelInleg = momenteelInlegVoorPersoon(u, verwerktPerPersoon);
       const momenteelTegoed = Math.max(0, verwerkt - u.opgehaald);
       return `<tr class="${u.id===me.id?'me':''}">
         <td>${personDot(u.name)}${escapeHtml(u.name)}</td>
@@ -1126,7 +1150,7 @@ function dashboardView(allInlegLog, baseline){
     </div>
 
     <div class="totals" style="margin-bottom:22px;">
-      <div class="t"><div class="n" id="stat-planten-loods">${fmtNum(plantenNogInLoods(queueResult))}</div><div class="l">planten in loods</div></div>
+      <div class="t"><div class="n" id="stat-planten-loods">${fmtNum(plantenNogInLoods(queueResult, cache.users))}</div><div class="l">planten in loods</div></div>
       <div class="t"><div class="n">${fmtNum(totalZakjesToegekend)}</div><div class="l">zakjes toegekend</div></div>
       <div class="t"><div class="n">${fmtNum(totalOpgehaald)}</div><div class="l">al opgehaald</div></div>
       <div class="t"><div class="n" id="stat-zakjes-in-loods">${fmtNum(zakjesKlaarInLoods(queueResult, totalOpgehaald))}</div><div class="l">zakjes in loods</div></div>
