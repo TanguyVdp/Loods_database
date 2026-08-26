@@ -16,6 +16,12 @@
 -- > plak > Run.
 -- ============================================================
 
+-- defensief: deze kolommen bestaan enkel als de ratio-upgrade-SQL al gerund
+-- is — hier toevoegen (indien nog niet aanwezig) zodat de update eronder
+-- altijd werkt, ook als die migratie nog niet gebeurd is.
+alter table loods_baseline add column if not exists ratio_cutover_at timestamptz;
+alter table users add column if not exists legacy_zakjes integer not null default 0;
+
 delete from customer_log;
 delete from customers;
 delete from loods_log;
