@@ -344,12 +344,6 @@ const KLANT_RATIO_IN = 4, KLANT_RATIO_OUT = 1; // klanten: 4 geleverd -> 1 zakje
 const MAX_USERS = 25;
 const SESSION_KEY = "loods25-session";
 const BOSS_KEY = "wietloods-boss-session";
-// onthoudt de (gehashte) pincode van de ingelogde gebruiker voor deze browsersessie,
-// zodat Bob niet telkens opnieuw een code moet intypen om de wachtrij te kalibreren
-// (server-side wordt nog steeds gecontroleerd dat dit écht Bob's eigen pincode is)
-const MY_PIN_KEY = "loods25-mypin";
-function rememberMyPin(pinHash){ sessionStorage.setItem(MY_PIN_KEY, pinHash); }
-function myPinHash(){ return sessionStorage.getItem(MY_PIN_KEY); }
 // Kalibratiepunt van de wachtrij — instelbaar vanuit Boss menu.
 // offset_minutes = hoeveel de hele gesimuleerde klok verschoven staat t.o.v.
 // het pure model, zodat ALLE tijden (van iedereen) in de juiste, kloppende
@@ -1205,37 +1199,6 @@ function dashboardView(allInlegLog, baseline){
 
     ${queueWidgetHtml(queueResult, baseline)}
 
-    ${me.name.toLowerCase().startsWith('bob') ? `
-    <div class="section-title"><h2>${ICONS.clock}Wachtrij kalibreren</h2><span>enkel jij ziet dit</span></div>
-    <div class="card" style="margin-bottom:20px;">
-      <p class="hint">Vul in hoeveel er <b>op dit moment écht</b> in de loods ligt. De site berekent dan zelf hoeveel de klok van de hele wachtrij moet verschuiven zodat alle tijden (van iedereen) opnieuw kloppen — geen gaten of sprongen, alles schuift in dezelfde verhouding mee.</p>
-      <p class="hint">Huidige verschuiving: <b class="mono" style="color:var(--cream)">${baseline.offset_minutes >= 0 ? '+' : ''}${baseline.offset_minutes} min</b>, snelheid <b class="mono" style="color:var(--cream)">${baseline.batch_size}/${baseline.batch_minutes}min</b>${baseline.set_by ? ` — gezet door ${escapeHtml(baseline.set_by)} om ${fmtClock(new Date(baseline.set_at))}` : ' — nog niet ingesteld'}.</p>
-      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
-        <div>
-          <label for="loods-baseline-value">Werkelijke voorraad nu</label>
-          <input type="number" id="loods-baseline-value" min="0" placeholder="bv. 13385" style="max-width:150px;">
-        </div>
-        <div>
-          <label for="loods-baseline-batch-size">Zakjes / batch</label>
-          <input type="number" id="loods-baseline-batch-size" min="1" value="${baseline.batch_size}" style="max-width:90px;">
-        </div>
-        <div>
-          <label for="loods-baseline-batch-minutes">Minuten / batch</label>
-          <input type="number" id="loods-baseline-batch-minutes" min="1" value="${baseline.batch_minutes}" style="max-width:90px;">
-        </div>
-        <button class="btn boss small" id="loods-baseline-save" style="margin-bottom:1px;">Kalibreren</button>
-      </div>
-      <div class="err" id="loods-baseline-err"></div>
-      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line);">
-        ${baseline.paused
-          ? `<p class="hint">⏸ Gepauzeerd sinds <b>${fmtClock(new Date(baseline.paused_at))}</b> op ${fmtDate(new Date(baseline.paused_at))} — niemand kan nu inleggen/ophalen, de wachtrij-klok staat stil.</p>
-             <button class="btn boss small" id="loods-pause-toggle">Hervatten</button>`
-          : `<p class="hint">Pauzeert de hele wachtrij-klok én blokkeert inleg/ophalen voor iedereen — handig tijdens onderhoud (bv. een ratio-wijziging).</p>
-             <button class="btn boss small" id="loods-pause-toggle">Pauzeren</button>`}
-        <div class="err" id="loods-pause-err"></div>
-      </div>
-    </div>` : ''}
-
     <div class="grid2">
       <div class="card">
         <h2>${ICONS.sprout}Planten inleggen</h2>
@@ -1413,7 +1376,6 @@ function claimModal(user){
     if(error){ err.textContent = friendlyError(error); return; }
     session = user.id;
     localStorage.setItem(SESSION_KEY, session);
-    rememberMyPin(pinHash);
     closeModal();
     goTo('/');
     render();
@@ -1441,7 +1403,6 @@ function loginModal(user){
     if(error || !data){ err.textContent = 'Onjuiste code, probeer opnieuw.'; return; }
     session = user.id;
     localStorage.setItem(SESSION_KEY, session);
-    rememberMyPin(pinHash);
     closeModal();
     goTo('/');
     render();
@@ -1476,7 +1437,6 @@ function addProfileModal(){
     if(error){ err.textContent = friendlyError(error); return; }
     session = data.id;
     localStorage.setItem(SESSION_KEY, session);
-    rememberMyPin(pinHash);
     closeModal();
     goTo('/');
     render();
@@ -1558,7 +1518,6 @@ function profileSettingsModal(user){
     const { data, error } = await sb.rpc('fn_change_pin', { p_user_id: user.id, p_old_pin_hash: oldHash, p_new_pin_hash: newHash });
     btn.disabled = false;
     if(error || !data){ err.textContent = friendlyError(error); return; }
-    rememberMyPin(newHash); // anders blijft de onthouden code (bv. voor kalibreren) de oude
     err.textContent = '';
     document.getElementById('pset-pin-old').value = '';
     document.getElementById('pset-pin-new').value = '';
@@ -1738,6 +1697,36 @@ function bossView(allLog, allCustLog, loodsBaseline){
       </table>
     </div>
 
+    <div class="section-title"><h2>${ICONS.clock}Wachtrij kalibreren</h2><span>enkel hier zichtbaar</span></div>
+    <div class="card" style="margin-bottom:20px;">
+      <p class="hint">Vul in hoeveel er <b>op dit moment écht</b> in de loods ligt. De site berekent dan zelf hoeveel de klok van de hele wachtrij moet verschuiven zodat alle tijden (van iedereen) opnieuw kloppen — geen gaten of sprongen, alles schuift in dezelfde verhouding mee.</p>
+      <p class="hint">Huidige verschuiving: <b class="mono" style="color:var(--cream)">${loodsBaseline.offset_minutes >= 0 ? '+' : ''}${loodsBaseline.offset_minutes} min</b>, snelheid <b class="mono" style="color:var(--cream)">${loodsBaseline.batch_size}/${loodsBaseline.batch_minutes}min</b>${loodsBaseline.set_by ? ` — gezet door ${escapeHtml(loodsBaseline.set_by)} om ${fmtClock(new Date(loodsBaseline.set_at))}` : ' — nog niet ingesteld'}.</p>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+        <div>
+          <label for="loods-baseline-value">Werkelijke voorraad nu</label>
+          <input type="number" id="loods-baseline-value" min="0" placeholder="bv. 13385" style="max-width:150px;">
+        </div>
+        <div>
+          <label for="loods-baseline-batch-size">Zakjes / batch</label>
+          <input type="number" id="loods-baseline-batch-size" min="1" value="${loodsBaseline.batch_size}" style="max-width:90px;">
+        </div>
+        <div>
+          <label for="loods-baseline-batch-minutes">Minuten / batch</label>
+          <input type="number" id="loods-baseline-batch-minutes" min="1" value="${loodsBaseline.batch_minutes}" style="max-width:90px;">
+        </div>
+        <button class="btn boss small" id="loods-baseline-save" style="margin-bottom:1px;">Kalibreren</button>
+      </div>
+      <div class="err" id="loods-baseline-err"></div>
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line);">
+        ${loodsBaseline.paused
+          ? `<p class="hint">⏸ Gepauzeerd sinds <b>${fmtClock(new Date(loodsBaseline.paused_at))}</b> op ${fmtDate(new Date(loodsBaseline.paused_at))} — niemand kan nu inleggen/ophalen, de wachtrij-klok staat stil.</p>
+             <button class="btn boss small" id="loods-pause-toggle">Hervatten</button>`
+          : `<p class="hint">Pauzeert de hele wachtrij-klok én blokkeert inleg/ophalen voor iedereen — handig tijdens onderhoud (bv. een ratio-wijziging).</p>
+             <button class="btn boss small" id="loods-pause-toggle">Pauzeren</button>`}
+        <div class="err" id="loods-pause-err"></div>
+      </div>
+    </div>
+
     <div class="section-title"><h2>${ICONS.sprout}Inleg/ophalen registreren voor een profiel</h2><span>enkel via Boss menu — kies eerst een profiel</span></div>
     <div class="card" style="margin-bottom:20px;">
       <label for="boss-reg-person">Profiel</label>
@@ -1892,39 +1881,6 @@ function computeCalibrationOffset(log, batchSize, batchMinutes, totalIngelegd, r
   return Math.round((Date.now() - refTime.getTime()) / 60000);
 }
 
-// gebeurt als de onthouden inlogcode niet (meer) klopt: vraagt direct de
-// pincode opnieuw, verifieert 'm, en onthoudt de verse hash — i.p.v. te
-// eisen dat er eerst volledig uit-/opnieuw ingelogd wordt
-function reauthPinModal(){
-  return new Promise((resolve) => {
-    showModal(`<div class="modal">
-      <h3>Bevestig je code</h3>
-      <p class="hint">Je onthouden inlogcode klopt niet meer (bv. na een codewijziging). Vul je huidige pincode in om verder te gaan.</p>
-      <label>Code</label>
-      <input type="password" inputmode="numeric" id="reauth-pin" placeholder="••••" maxlength="8">
-      <div class="err" id="reauth-err"></div>
-      <div class="row-btns">
-        <button class="btn secondary" id="reauth-cancel" style="flex:1">Annuleren</button>
-        <button class="btn" id="reauth-ok" style="flex:1">Bevestigen</button>
-      </div>
-    </div>`);
-    document.getElementById('reauth-cancel').onclick = () => { closeModal(); resolve(null); };
-    const tryConfirm = async () => {
-      const pin = document.getElementById('reauth-pin').value.trim();
-      const err = document.getElementById('reauth-err');
-      if(!pin){ err.textContent = 'Vul je code in.'; return; }
-      const hash = await hashPin(pin);
-      const { data, error } = await sb.rpc('fn_verify_login', { p_user_id: session, p_pin_hash: hash });
-      if(error || !data){ err.textContent = 'Onjuiste code, probeer opnieuw.'; return; }
-      rememberMyPin(hash);
-      closeModal();
-      resolve(hash);
-    };
-    document.getElementById('reauth-ok').onclick = tryConfirm;
-    document.getElementById('reauth-pin').addEventListener('keydown', e => { if(e.key==='Enter') tryConfirm(); });
-  });
-}
-
 async function saveLoodsBaseline(){
   const err = document.getElementById('loods-baseline-err');
   const val = parseInt(document.getElementById('loods-baseline-value').value, 10);
@@ -1938,18 +1894,11 @@ async function saveLoodsBaseline(){
     const freshLog = await fetchAllLoodsLog();
     const totalIngelegd = cache.users.reduce((s,u) => s + u.total_ingelegd, 0);
     const offsetMinutes = computeCalibrationOffset(freshLog, bs, bm, totalIngelegd, val);
-    let { error } = await sb.rpc('fn_set_loods_baseline', {
+    const me = getUser(session);
+    const { error } = await sb.rpc('fn_set_loods_baseline', {
       p_offset_minutes: offsetMinutes, p_batch_size: bs, p_batch_minutes: bm,
-      p_user_id: session, p_pin_hash: myPinHash()
+      p_boss_pin_hash: bossPinHash(), p_set_by: me ? me.name : 'boss'
     });
-    if(error && error.message === 'ONJUISTE_CODE'){
-      const freshHash = await reauthPinModal();
-      if(!freshHash){ btn.disabled = false; btn.textContent = 'Kalibreren'; return; }
-      ({ error } = await sb.rpc('fn_set_loods_baseline', {
-        p_offset_minutes: offsetMinutes, p_batch_size: bs, p_batch_minutes: bm,
-        p_user_id: session, p_pin_hash: freshHash
-      }));
-    }
     if(error){ err.textContent = friendlyError(error); btn.disabled = false; btn.textContent = 'Kalibreren'; return; }
     err.textContent = '';
     showToast('Wachtrij gekalibreerd — alle tijden herberekend.');
@@ -1994,6 +1943,10 @@ function attachBossHandlers(){
     });
   });
   attachRowDrag(document.getElementById('boss-summary-tbody'), saveBossOrder);
+  const baselineBtn = document.getElementById('loods-baseline-save');
+  if(baselineBtn) baselineBtn.addEventListener('click', saveLoodsBaseline);
+  const pauseBtn = document.getElementById('loods-pause-toggle');
+  if(pauseBtn) pauseBtn.addEventListener('click', toggleMaintenance);
 
   const regPersonSel = document.getElementById('boss-reg-person');
   if(regPersonSel){
@@ -2091,7 +2044,6 @@ function attachCommonHandlers(){
       closeMobileMenu();
       session = null;
       localStorage.removeItem(SESSION_KEY);
-      sessionStorage.removeItem(MY_PIN_KEY);
       goTo('/');
       render();
     });
@@ -2105,11 +2057,6 @@ function attachDashboardHandlers(){
   attachCommonHandlers();
   attachQueueWidgetHandlers();
   startQueueTicker();
-
-  const baselineBtn = document.getElementById('loods-baseline-save');
-  if(baselineBtn) baselineBtn.addEventListener('click', saveLoodsBaseline);
-  const pauseBtn = document.getElementById('loods-pause-toggle');
-  if(pauseBtn) pauseBtn.addEventListener('click', toggleMaintenance);
 
   const paused = lastLoodsBaseline && lastLoodsBaseline.paused;
 
@@ -2166,12 +2113,7 @@ async function toggleMaintenance(){
   const wantPause = !lastLoodsBaseline.paused;
   if(wantPause && !confirm('Wachtrij pauzeren? Niemand kan dan nog inleggen of ophalen tot je opnieuw hervat.')) return;
   btn.disabled = true; btn.textContent = 'Bezig…';
-  let { error } = await sb.rpc('fn_set_maintenance', { p_paused: wantPause, p_user_id: session, p_pin_hash: myPinHash() });
-  if(error && error.message === 'ONJUISTE_CODE'){
-    const freshHash = await reauthPinModal();
-    if(!freshHash){ btn.disabled = false; btn.textContent = wantPause ? 'Pauzeren' : 'Hervatten'; return; }
-    ({ error } = await sb.rpc('fn_set_maintenance', { p_paused: wantPause, p_user_id: session, p_pin_hash: freshHash }));
-  }
+  const { error } = await sb.rpc('fn_set_maintenance', { p_paused: wantPause, p_boss_pin_hash: bossPinHash() });
   if(error){ err.textContent = friendlyError(error); btn.disabled = false; btn.textContent = wantPause ? 'Pauzeren' : 'Hervatten'; return; }
   showToast(wantPause ? 'Wachtrij gepauzeerd.' : 'Wachtrij hervat.');
   render();
