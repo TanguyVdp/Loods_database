@@ -45,7 +45,7 @@ async function sbGet(path, extraHeaders) {
 }
 
 // ---------- exacte kopie van de wachtrij-logica uit index.html ----------
-const RATIO_IN = 3;         // huidige ratio: 3 planten -> 1 zakje (blijft zo tot de loods leeg is)
+const RATIO_IN = 2;         // huidige ratio: 2 planten -> 1 zakje (loods-upgrade, ingegaan op lege loods)
 const LEGACY_RATIO_IN = 3;  // oude ratio, voor het bevroren legacy-deel
 
 const RESTART_WINDOWS = [

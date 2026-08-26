@@ -336,7 +336,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_pqkMMN1YXz8mMd56_92BUQ_jKSQCfWx";
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const RATIO_IN = 3, RATIO_OUT = 1;             // leden: 3 planten -> 1 zakje (blijft zo tot de loods leeg is)
+const RATIO_IN = 2, RATIO_OUT = 1;             // leden: 2 planten -> 1 zakje (loods-upgrade, ingegaan op lege loods)
 // legacy_zakjes (per persoon, bevroren bij de upgrade) is verwerkt aan de
 // OUDE ratio — deze constante blijft die oude waarde, los van RATIO_IN.
 const LEGACY_RATIO_IN = 3;
