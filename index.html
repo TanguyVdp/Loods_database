@@ -769,6 +769,7 @@ function closeMobileMenu(){
   document.getElementById('sidebar-overlay')?.classList.remove('open');
 }
 function fmtNum(n){ return Number(n).toLocaleString('nl-BE'); }
+function fmtPrice(n){ return Number(n || 0).toLocaleString('nl-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 // ---------- paginatie voor logboeken (25 per pagina) ----------
 const LOG_PAGE_SIZE = 25;
@@ -1247,6 +1248,7 @@ function dashboardView(allInlegLog, baseline){
 function klantenListView(){
   const totalGeleverd = cache.customers.reduce((s,c)=>s+c.total_geleverd,0);
   const totalZakjes = cache.customers.reduce((s,c)=>s+zakjesVoorKlant(c.total_geleverd),0);
+  const totalOmzet = cache.customers.reduce((s,c)=>s+(c.total_omzet||0),0);
 
   const rows = [...cache.customers].sort((a,b)=>a.name.localeCompare(b.name)).map(c => {
     const z = zakjesVoorKlant(c.total_geleverd);
@@ -1255,6 +1257,8 @@ function klantenListView(){
       <td>${c.groep ? `<span class="pill">${escapeHtml(c.groep)}</span>` : ''}</td>
       <td class="num">${fmtNum(c.total_geleverd)}</td>
       <td class="num tegoed">${fmtNum(z)}</td>
+      <td class="num">${fmtNum(c.total_verkocht||0)}</td>
+      <td class="num" style="color:var(--violet);">€${fmtPrice(c.total_omzet||0)}</td>
     </tr>`;
   }).join('');
 
@@ -1269,11 +1273,12 @@ function klantenListView(){
 
     <div class="totals" style="margin-bottom:22px;">
       <div class="t"><div class="n">${fmtNum(cache.customers.length)}</div><div class="l">klanten</div></div>
-      <div class="t"><div class="n">${fmtNum(totalGeleverd)}</div><div class="l">totaal geleverd</div></div>
+      <div class="t"><div class="n">${fmtNum(totalGeleverd)}</div><div class="l">totaal geswapt</div></div>
       <div class="t"><div class="n">${fmtNum(totalZakjes)}</div><div class="l">zakjes meegekregen</div></div>
+      <div class="t"><div class="n" style="color:var(--violet);">€${fmtPrice(totalOmzet)}</div><div class="l">totale omzet</div></div>
     </div>
 
-    <div class="section-title"><h2>${ICONS.users}Klantenbestand</h2><span>omrekening: ${KLANT_RATIO_IN}:${KLANT_RATIO_OUT}</span></div>
+    <div class="section-title"><h2>${ICONS.users}Klantenbestand</h2><span>swappen: ${KLANT_RATIO_IN}:${KLANT_RATIO_OUT}</span></div>
     <div class="card">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
         <input type="text" class="klant-search" id="klant-search" placeholder="Zoek op naam of groep…" style="flex:1;min-width:180px;">
@@ -1284,7 +1289,7 @@ function klantenListView(){
 
     <div class="card" style="padding:14px 20px;margin-top:16px;">
       <table id="klant-table">
-        <thead><tr><th>Naam</th><th>Groep</th><th class="num">Geleverd</th><th class="num">Zakjes</th></tr></thead>
+        <thead><tr><th>Naam</th><th>Groep</th><th class="num">Geswapt</th><th class="num">Zakjes</th><th class="num">Verkocht</th><th class="num">Omzet</th></tr></thead>
         <tbody id="klant-tbody">${rows || ''}</tbody>
       </table>
       ${cache.customers.length===0 ? '<div class="empty">Nog geen klanten aangemaakt.</div>' : ''}
@@ -1293,14 +1298,25 @@ function klantenListView(){
 }
 
 // ---------- KLANT DETAIL VIEW (eigen pagina) ----------
+let klantRegMode = 'swap'; // 'swap' | 'verkoop' — blijft staan over renders heen
+
 function klantDetailView(k, klantLog){
   const z = zakjesVoorKlant(k.total_geleverd);
 
   const klantLogPaged = paginateList(klantLog, `klant-${k.id}`);
   const entries = klantLogPaged.pageItems.map(e => {
+    if(e.kind === 'levering'){
+      return `<div class="entry ophalen">
+        <div class="ts">${fmtTs(e.ts)}</div>
+        <div class="desc">${e.amount} verkocht aan €${fmtPrice(e.price_per_unit)}/stuk — ingevuld door ${personDot(e.by_user_name)}<b>${escapeHtml(e.by_user_name)}</b>
+          <span class="sub">totaal verkocht: ${e.cumulative_after} · omzet deze verkoop: €${fmtPrice(e.total_price)}</span>
+        </div>
+        <div class="delta">€${fmtPrice(e.total_price)}</div>
+      </div>`;
+    }
     return `<div class="entry levering">
       <div class="ts">${fmtTs(e.ts)}</div>
-      <div class="desc">${e.amount} geleverd — ingevuld door ${personDot(e.by_user_name)}<b>${escapeHtml(e.by_user_name)}</b>
+      <div class="desc">${e.amount} geswapt — ingevuld door ${personDot(e.by_user_name)}<b>${escapeHtml(e.by_user_name)}</b>
         <span class="sub">totaal ${e.cumulative_after} · direct meegekregen: ${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'}</span>
       </div>
       <div class="delta">+${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'}</div>
@@ -1321,19 +1337,42 @@ function klantDetailView(k, klantLog){
         </div>
       </div>
       <div class="totals">
-        <div class="t"><div class="n">${fmtNum(k.total_geleverd)}</div><div class="l">geleverd</div></div>
+        <div class="t"><div class="n">${fmtNum(k.total_geleverd)}</div><div class="l">geswapt</div></div>
         <div class="t"><div class="n tegoed">${fmtNum(z)}</div><div class="l">zakjes meegekregen</div></div>
+        <div class="t"><div class="n">${fmtNum(k.total_verkocht || 0)}</div><div class="l">verkocht</div></div>
+        <div class="t"><div class="n" style="color:var(--violet);">€${fmtPrice(k.total_omzet || 0)}</div><div class="l">omzet</div></div>
       </div>
     </div>
 
     <div class="card">
-      <h2><span style="color:var(--violet);display:inline-flex;">${ICONS.truck}</span>Levering registreren</h2>
-      <p class="hint">Vul in hoeveel ${escapeHtml(k.name)} geleverd heeft. Wordt opgeteld bij het totaal (${k.total_geleverd} nu). Bij klanten geldt: elke ${KLANT_RATIO_IN} geleverd = ${KLANT_RATIO_OUT} zakje, en die krijgen ze er meteen bij mee — er wordt dus niets tegoed gehouden.</p>
-      <label for="kl-amount">Aantal geleverd</label>
-      <input type="number" id="kl-amount" min="1" step="1" placeholder="bv. 40">
-      <div class="preview" id="kl-preview"></div>
-      <div style="margin-top:14px;"><button class="btn klant block" id="kl-submit">Registreren</button></div>
-      <div class="err" id="kl-err"></div>
+      <h2><span style="color:var(--violet);display:inline-flex;">${ICONS.truck}</span>Registreren</h2>
+      <div class="row-btns" style="margin-bottom:14px;">
+        <button class="btn ${klantRegMode==='swap'?'klant':'secondary'}" data-kl-mode="swap" style="flex:1">Swappen (${KLANT_RATIO_IN}/${KLANT_RATIO_OUT})</button>
+        <button class="btn ${klantRegMode==='verkoop'?'klant':'secondary'}" data-kl-mode="verkoop" style="flex:1">Leveren (verkopen)</button>
+      </div>
+      ${klantRegMode === 'swap' ? `
+        <p class="hint">Vul in hoeveel ${escapeHtml(k.name)} geswapt heeft. Wordt opgeteld bij het totaal (${k.total_geleverd} nu). Elke ${KLANT_RATIO_IN} geswapt = ${KLANT_RATIO_OUT} zakje, en die krijgen ze er meteen bij mee — er wordt dus niets tegoed gehouden.</p>
+        <label for="kl-amount">Aantal geswapt</label>
+        <input type="number" id="kl-amount" min="1" step="1" placeholder="bv. 40">
+        <div class="preview" id="kl-preview"></div>
+        <div style="margin-top:14px;"><button class="btn klant block" id="kl-submit">Registreren</button></div>
+        <div class="err" id="kl-err"></div>
+      ` : `
+        <p class="hint">Vul in hoeveel ${escapeHtml(k.name)} kocht en aan welke prijs per stuk. De totaalprijs wordt automatisch berekend — dit levert geen zakjes op, puur een verkoop.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:120px;">
+            <label for="kl-verkoop-amount">Aantal</label>
+            <input type="number" id="kl-verkoop-amount" min="1" step="1" placeholder="bv. 40">
+          </div>
+          <div style="flex:1;min-width:120px;">
+            <label for="kl-verkoop-prijs">Prijs per stuk (€)</label>
+            <input type="number" id="kl-verkoop-prijs" min="0" step="0.01" placeholder="bv. 5.00">
+          </div>
+        </div>
+        <div class="preview" id="kl-verkoop-preview"></div>
+        <div style="margin-top:14px;"><button class="btn klant block" id="kl-verkoop-submit">Registreren</button></div>
+        <div class="err" id="kl-verkoop-err"></div>
+      `}
     </div>
 
     <div class="section-title"><h2>${ICONS.list}Geschiedenis van ${escapeHtml(k.name)}</h2><span>${klantLog.length} registraties</span></div>
@@ -2140,6 +2179,8 @@ function attachKlantenListHandlers(){
         <td>${c.groep ? `<span class="pill">${escapeHtml(c.groep)}</span>` : ''}</td>
         <td class="num">${fmtNum(c.total_geleverd)}</td>
         <td class="num tegoed">${fmtNum(z)}</td>
+        <td class="num">${fmtNum(c.total_verkocht||0)}</td>
+        <td class="num" style="color:var(--violet);">€${fmtPrice(c.total_omzet||0)}</td>
       </tr>`;
     }).join('');
     document.getElementById('klant-tbody').innerHTML = rows;
@@ -2153,26 +2194,61 @@ function attachKlantenListHandlers(){
 function attachKlantDetailHandlers(k){
   attachCommonHandlers();
 
+  document.querySelectorAll('[data-kl-mode]').forEach(el=>{
+    el.addEventListener('click', () => {
+      klantRegMode = el.getAttribute('data-kl-mode');
+      render();
+    });
+  });
+
   const klAmount = document.getElementById('kl-amount');
-  const preview = document.getElementById('kl-preview');
-  klAmount.addEventListener('input', () => {
-    const v = parseInt(klAmount.value, 10);
-    if(!v || v <= 0){ preview.innerHTML=''; return; }
-    const newTotal = k.total_geleverd + v;
-    const newZakjes = zakjesVoorKlant(newTotal);
-    const delta = newZakjes - zakjesVoorKlant(k.total_geleverd);
-    preview.innerHTML = `Nieuw totaal: <b>${newTotal}</b> → er komt <b>+${delta}</b> zakje${delta===1?'':'s'} bij.`;
-  });
-  document.getElementById('kl-submit').addEventListener('click', async () => {
-    const v = parseInt(klAmount.value, 10);
-    const err = document.getElementById('kl-err');
-    if(!v || v <= 0){ err.textContent = 'Voer een geldig aantal in.'; return; }
-    const me = getUser(session);
-    const { error } = await sb.rpc('fn_register_levering', { p_customer_id: k.id, p_amount: v, p_by_user_id: me.id, p_by_user_name: me.name });
-    if(error){ err.textContent = friendlyError(error); return; }
-    showToast(`Levering geregistreerd voor ${k.name}.`);
-    render();
-  });
+  if(klAmount){
+    const preview = document.getElementById('kl-preview');
+    klAmount.addEventListener('input', () => {
+      const v = parseInt(klAmount.value, 10);
+      if(!v || v <= 0){ preview.innerHTML=''; return; }
+      const newTotal = k.total_geleverd + v;
+      const newZakjes = zakjesVoorKlant(newTotal);
+      const delta = newZakjes - zakjesVoorKlant(k.total_geleverd);
+      preview.innerHTML = `Nieuw totaal: <b>${newTotal}</b> → er komt <b>+${delta}</b> zakje${delta===1?'':'s'} bij.`;
+    });
+    document.getElementById('kl-submit').addEventListener('click', async () => {
+      const v = parseInt(klAmount.value, 10);
+      const err = document.getElementById('kl-err');
+      if(!v || v <= 0){ err.textContent = 'Voer een geldig aantal in.'; return; }
+      const me = getUser(session);
+      const { error } = await sb.rpc('fn_register_levering', { p_customer_id: k.id, p_amount: v, p_by_user_id: me.id, p_by_user_name: me.name });
+      if(error){ err.textContent = friendlyError(error); return; }
+      showToast(`Swap geregistreerd voor ${k.name}.`);
+      render();
+    });
+  }
+
+  const vkAmount = document.getElementById('kl-verkoop-amount');
+  if(vkAmount){
+    const vkPrijs = document.getElementById('kl-verkoop-prijs');
+    const vkPreview = document.getElementById('kl-verkoop-preview');
+    const updateVkPreview = () => {
+      const v = parseFloat(vkAmount.value);
+      const p = parseFloat(vkPrijs.value);
+      if(!v || v <= 0 || !p || p < 0){ vkPreview.innerHTML=''; return; }
+      vkPreview.innerHTML = `Totaalprijs: <b>€${fmtPrice(v * p)}</b>`;
+    };
+    vkAmount.addEventListener('input', updateVkPreview);
+    vkPrijs.addEventListener('input', updateVkPreview);
+    document.getElementById('kl-verkoop-submit').addEventListener('click', async () => {
+      const v = parseInt(vkAmount.value, 10);
+      const p = parseFloat(vkPrijs.value);
+      const err = document.getElementById('kl-verkoop-err');
+      if(!v || v <= 0){ err.textContent = 'Voer een geldig aantal in.'; return; }
+      if(isNaN(p) || p < 0){ err.textContent = 'Voer een geldige prijs per stuk in.'; return; }
+      const me = getUser(session);
+      const { error } = await sb.rpc('fn_register_levering_verkoop', { p_customer_id: k.id, p_amount: v, p_price_per_unit: p, p_by_user_id: me.id, p_by_user_name: me.name });
+      if(error){ err.textContent = friendlyError(error); return; }
+      showToast(`Verkoop geregistreerd voor ${k.name}: €${fmtPrice(v * p)}.`);
+      render();
+    });
+  }
 }
 
 boot();
