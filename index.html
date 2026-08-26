@@ -356,7 +356,9 @@ const LOODS_CONFIG_DEFAULT = {
   set_at: new Date(0).toISOString(),
   batch_size: 3,
   batch_minutes: 3,
-  set_by: null
+  set_by: null,
+  paused: false,
+  paused_at: null
 };
 async function fetchLoodsBaseline(){
   const { data, error } = await sb.from('loods_baseline').select('*').eq('id', true).maybeSingle();
@@ -495,17 +497,27 @@ let lastLoodsBaseline = { ...LOODS_CONFIG_DEFAULT };
 let queueTickInterval = null;
 let queueFilterMode = 'active'; // 'active' = bezig/nog beginnen (standaard) | 'done' = afgerond
 
+// tijdens onderhoudsmodus (lastLoodsBaseline.paused) staat de gesimuleerde
+// wachtrij-klok stil op het exacte moment van pauzeren — overal waar de
+// wachtrij "nu" nodig heeft, gebruik je deze i.p.v. rechtstreeks new Date()
+function nowForQueue(){
+  if(lastLoodsBaseline && lastLoodsBaseline.paused && lastLoodsBaseline.paused_at){
+    return new Date(lastLoodsBaseline.paused_at);
+  }
+  return new Date();
+}
+
 // hoeveel zakjes er volgens de (gekalibreerde) wachtrij tot nu toe al ECHT
 // verwerkt zijn (site-breed, over iedereen heen) — telt op BATCH-niveau
 // (niet per inleg), dus een grote inleg die over meerdere batches loopt telt
 // al gedeeltelijk mee zodra de eerste batches ervan klaar zijn
 function verwerkteZakjesInQueue(result){
-  const now = new Date();
+  const now = nowForQueue();
   return result.batches.filter(b => b.end <= now).reduce((s,b) => s + b.zakjes, 0);
 }
 // zelfde telling, maar per persoon (user_id -> aantal al verwerkte zakjes)
 function verwerkteZakjesPerPersoon(result){
-  const now = new Date();
+  const now = nowForQueue();
   const map = new Map();
   result.batches.filter(b => b.end <= now).forEach(b => {
     Object.entries(b.byUser).forEach(([name, count]) => {
@@ -550,12 +562,13 @@ function updateLoodsStatTile(){
 
 function queueWidgetHtml(result, baseline){
   const deposits = result.deposits;
-  const now = new Date();
+  const now = nowForQueue();
   const active = deposits.filter(t => t.end > now).sort((a,b) => a.start - b.start);
   const done = deposits.filter(t => t.end <= now).sort((a,b) => b.end - a.end).slice(0, 100);
   const filter = queueFilterMode;
   const list = filter === 'done' ? done : active;
   const hint = `Eerlijk op volgorde van inleg (FIFO) — batches van ${baseline.batch_size} zakjes per ${baseline.batch_minutes} min. Een batch die een server-restart raakt (7u58-8u03, 11u58-12u03, 17u58-18u03) herbegint volledig na de restart.`;
+  const pauseBanner = baseline.paused ? `<div class="hint" style="margin-bottom:14px;padding:10px 12px;border-radius:8px;background:rgba(255,180,60,0.12);border:1px solid rgba(255,180,60,0.35);color:#ffb43c;">⏸ De wachtrij staat gepauzeerd sinds ${fmtClock(new Date(baseline.paused_at))} (${fmtDate(new Date(baseline.paused_at))}) voor onderhoud — de tijden hieronder bewegen niet mee.</div>` : '';
 
   const pendingEnds = result.batches.map(b => b.end).filter(e => e > now);
   const etaLine = pendingEnds.length ? (() => {
@@ -572,6 +585,7 @@ function queueWidgetHtml(result, baseline){
   if(list.length === 0){
     return `<div class="card" id="queue-widget" style="margin-bottom:20px;">
       <h2>${ICONS.clock}Verwerkingswachtrij</h2>
+      ${pauseBanner}
       ${etaLine}
       <p class="hint">${hint}</p>
       ${filterRow}
@@ -603,6 +617,7 @@ function queueWidgetHtml(result, baseline){
 
   return `<div class="card" id="queue-widget" style="margin-bottom:20px;">
     <h2>${ICONS.clock}Verwerkingswachtrij</h2>
+    ${pauseBanner}
     ${etaLine}
     <p class="hint">${hint}</p>
     ${filterRow}
@@ -1146,6 +1161,14 @@ function dashboardView(allInlegLog, baseline){
         <button class="btn boss small" id="loods-baseline-save" style="margin-bottom:1px;">Kalibreren</button>
       </div>
       <div class="err" id="loods-baseline-err"></div>
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line);">
+        ${baseline.paused
+          ? `<p class="hint">⏸ Gepauzeerd sinds <b>${fmtClock(new Date(baseline.paused_at))}</b> op ${fmtDate(new Date(baseline.paused_at))} — niemand kan nu inleggen/ophalen, de wachtrij-klok staat stil.</p>
+             <button class="btn boss small" id="loods-pause-toggle">Hervatten</button>`
+          : `<p class="hint">Pauzeert de hele wachtrij-klok én blokkeert inleg/ophalen voor iedereen — handig tijdens onderhoud (bv. een ratio-wijziging).</p>
+             <button class="btn boss small" id="loods-pause-toggle">Pauzeren</button>`}
+        <div class="err" id="loods-pause-err"></div>
+      </div>
     </div>` : ''}
 
     <div class="grid2">
@@ -1850,10 +1873,19 @@ function attachDashboardHandlers(){
 
   const baselineBtn = document.getElementById('loods-baseline-save');
   if(baselineBtn) baselineBtn.addEventListener('click', saveLoodsBaseline);
+  const pauseBtn = document.getElementById('loods-pause-toggle');
+  if(pauseBtn) pauseBtn.addEventListener('click', toggleMaintenance);
+
+  const paused = lastLoodsBaseline && lastLoodsBaseline.paused;
 
   const inAmount = document.getElementById('in-amount');
   if(inAmount){
     const preview = document.getElementById('in-preview');
+    if(paused){
+      inAmount.disabled = true;
+      document.getElementById('in-submit').disabled = true;
+      preview.innerHTML = '<span class="err">De loods is tijdelijk gepauzeerd voor onderhoud — even geduld.</span>';
+    }
     inAmount.addEventListener('input', () => {
       const v = parseInt(inAmount.value, 10);
       if(!v || v <= 0){ preview.innerHTML=''; return; }
@@ -1876,6 +1908,11 @@ function attachDashboardHandlers(){
 
   const outAmount = document.getElementById('out-amount');
   if(outAmount){
+    if(paused){
+      outAmount.disabled = true;
+      document.getElementById('out-submit').disabled = true;
+      document.getElementById('out-err').innerHTML = '<span>De loods is tijdelijk gepauzeerd voor onderhoud — even geduld.</span>';
+    }
     document.getElementById('out-submit').addEventListener('click', async () => {
       const v = parseInt(outAmount.value, 10);
       const err = document.getElementById('out-err');
@@ -1886,6 +1923,18 @@ function attachDashboardHandlers(){
       render();
     });
   }
+}
+
+async function toggleMaintenance(){
+  const err = document.getElementById('loods-pause-err');
+  const btn = document.getElementById('loods-pause-toggle');
+  const wantPause = !lastLoodsBaseline.paused;
+  if(wantPause && !confirm('Wachtrij pauzeren? Niemand kan dan nog inleggen of ophalen tot je opnieuw hervat.')) return;
+  btn.disabled = true; btn.textContent = 'Bezig…';
+  const { error } = await sb.rpc('fn_set_maintenance', { p_paused: wantPause, p_user_id: session, p_pin_hash: myPinHash() });
+  if(error){ err.textContent = friendlyError(error); btn.disabled = false; btn.textContent = wantPause ? 'Pauzeren' : 'Hervatten'; return; }
+  showToast(wantPause ? 'Wachtrij gepauzeerd.' : 'Wachtrij hervat.');
+  render();
 }
 
 // ---------- event wiring: klanten list ----------
