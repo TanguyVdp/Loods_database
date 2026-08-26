@@ -1783,6 +1783,39 @@ function computeCalibrationOffset(log, batchSize, batchMinutes, totalIngelegd, r
   return Math.round((Date.now() - refTime.getTime()) / 60000);
 }
 
+// gebeurt als de onthouden inlogcode niet (meer) klopt: vraagt direct de
+// pincode opnieuw, verifieert 'm, en onthoudt de verse hash — i.p.v. te
+// eisen dat er eerst volledig uit-/opnieuw ingelogd wordt
+function reauthPinModal(){
+  return new Promise((resolve) => {
+    showModal(`<div class="modal">
+      <h3>Bevestig je code</h3>
+      <p class="hint">Je onthouden inlogcode klopt niet meer (bv. na een codewijziging). Vul je huidige pincode in om verder te gaan.</p>
+      <label>Code</label>
+      <input type="password" inputmode="numeric" id="reauth-pin" placeholder="••••" maxlength="8">
+      <div class="err" id="reauth-err"></div>
+      <div class="row-btns">
+        <button class="btn secondary" id="reauth-cancel" style="flex:1">Annuleren</button>
+        <button class="btn" id="reauth-ok" style="flex:1">Bevestigen</button>
+      </div>
+    </div>`);
+    document.getElementById('reauth-cancel').onclick = () => { closeModal(); resolve(null); };
+    const tryConfirm = async () => {
+      const pin = document.getElementById('reauth-pin').value.trim();
+      const err = document.getElementById('reauth-err');
+      if(!pin){ err.textContent = 'Vul je code in.'; return; }
+      const hash = await hashPin(pin);
+      const { data, error } = await sb.rpc('fn_verify_login', { p_user_id: session, p_pin_hash: hash });
+      if(error || !data){ err.textContent = 'Onjuiste code, probeer opnieuw.'; return; }
+      rememberMyPin(hash);
+      closeModal();
+      resolve(hash);
+    };
+    document.getElementById('reauth-ok').onclick = tryConfirm;
+    document.getElementById('reauth-pin').addEventListener('keydown', e => { if(e.key==='Enter') tryConfirm(); });
+  });
+}
+
 async function saveLoodsBaseline(){
   const err = document.getElementById('loods-baseline-err');
   const val = parseInt(document.getElementById('loods-baseline-value').value, 10);
@@ -1796,16 +1829,19 @@ async function saveLoodsBaseline(){
     const freshLog = await fetchAllLoodsLog();
     const totalIngelegd = cache.users.reduce((s,u) => s + u.total_ingelegd, 0);
     const offsetMinutes = computeCalibrationOffset(freshLog, bs, bm, totalIngelegd, val);
-    const { error } = await sb.rpc('fn_set_loods_baseline', {
+    let { error } = await sb.rpc('fn_set_loods_baseline', {
       p_offset_minutes: offsetMinutes, p_batch_size: bs, p_batch_minutes: bm,
       p_user_id: session, p_pin_hash: myPinHash()
     });
-    if(error){
-      err.textContent = (error.message === 'ONJUISTE_CODE')
-        ? 'Je onthouden inlogcode klopt niet meer (bv. na een codewijziging) — log even uit en opnieuw in, en probeer dan opnieuw.'
-        : friendlyError(error);
-      btn.disabled = false; btn.textContent = 'Kalibreren'; return;
+    if(error && error.message === 'ONJUISTE_CODE'){
+      const freshHash = await reauthPinModal();
+      if(!freshHash){ btn.disabled = false; btn.textContent = 'Kalibreren'; return; }
+      ({ error } = await sb.rpc('fn_set_loods_baseline', {
+        p_offset_minutes: offsetMinutes, p_batch_size: bs, p_batch_minutes: bm,
+        p_user_id: session, p_pin_hash: freshHash
+      }));
     }
+    if(error){ err.textContent = friendlyError(error); btn.disabled = false; btn.textContent = 'Kalibreren'; return; }
     err.textContent = '';
     showToast('Wachtrij gekalibreerd — alle tijden herberekend.');
     render();
@@ -1973,13 +2009,13 @@ async function toggleMaintenance(){
   const wantPause = !lastLoodsBaseline.paused;
   if(wantPause && !confirm('Wachtrij pauzeren? Niemand kan dan nog inleggen of ophalen tot je opnieuw hervat.')) return;
   btn.disabled = true; btn.textContent = 'Bezig…';
-  const { error } = await sb.rpc('fn_set_maintenance', { p_paused: wantPause, p_user_id: session, p_pin_hash: myPinHash() });
-  if(error){
-    err.textContent = (error.message === 'ONJUISTE_CODE')
-      ? 'Je onthouden inlogcode klopt niet meer (bv. na een codewijziging) — log even uit en opnieuw in, en probeer dan opnieuw.'
-      : friendlyError(error);
-    btn.disabled = false; btn.textContent = wantPause ? 'Pauzeren' : 'Hervatten'; return;
+  let { error } = await sb.rpc('fn_set_maintenance', { p_paused: wantPause, p_user_id: session, p_pin_hash: myPinHash() });
+  if(error && error.message === 'ONJUISTE_CODE'){
+    const freshHash = await reauthPinModal();
+    if(!freshHash){ btn.disabled = false; btn.textContent = wantPause ? 'Pauzeren' : 'Hervatten'; return; }
+    ({ error } = await sb.rpc('fn_set_maintenance', { p_paused: wantPause, p_user_id: session, p_pin_hash: freshHash }));
   }
+  if(error){ err.textContent = friendlyError(error); btn.disabled = false; btn.textContent = wantPause ? 'Pauzeren' : 'Hervatten'; return; }
   showToast(wantPause ? 'Wachtrij gepauzeerd.' : 'Wachtrij hervat.');
   render();
 }
