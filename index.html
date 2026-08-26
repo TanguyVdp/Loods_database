@@ -1517,6 +1517,7 @@ function profileSettingsModal(user){
     const { data, error } = await sb.rpc('fn_change_pin', { p_user_id: user.id, p_old_pin_hash: oldHash, p_new_pin_hash: newHash });
     btn.disabled = false;
     if(error || !data){ err.textContent = friendlyError(error); return; }
+    rememberMyPin(newHash); // anders blijft de onthouden code (bv. voor kalibreren) de oude
     err.textContent = '';
     document.getElementById('pset-pin-old').value = '';
     document.getElementById('pset-pin-new').value = '';
@@ -1799,7 +1800,12 @@ async function saveLoodsBaseline(){
       p_offset_minutes: offsetMinutes, p_batch_size: bs, p_batch_minutes: bm,
       p_user_id: session, p_pin_hash: myPinHash()
     });
-    if(error){ err.textContent = friendlyError(error); btn.disabled = false; btn.textContent = 'Kalibreren'; return; }
+    if(error){
+      err.textContent = (error.message === 'ONJUISTE_CODE')
+        ? 'Je onthouden inlogcode klopt niet meer (bv. na een codewijziging) — log even uit en opnieuw in, en probeer dan opnieuw.'
+        : friendlyError(error);
+      btn.disabled = false; btn.textContent = 'Kalibreren'; return;
+    }
     err.textContent = '';
     showToast('Wachtrij gekalibreerd — alle tijden herberekend.');
     render();
@@ -1968,7 +1974,12 @@ async function toggleMaintenance(){
   if(wantPause && !confirm('Wachtrij pauzeren? Niemand kan dan nog inleggen of ophalen tot je opnieuw hervat.')) return;
   btn.disabled = true; btn.textContent = 'Bezig…';
   const { error } = await sb.rpc('fn_set_maintenance', { p_paused: wantPause, p_user_id: session, p_pin_hash: myPinHash() });
-  if(error){ err.textContent = friendlyError(error); btn.disabled = false; btn.textContent = wantPause ? 'Pauzeren' : 'Hervatten'; return; }
+  if(error){
+    err.textContent = (error.message === 'ONJUISTE_CODE')
+      ? 'Je onthouden inlogcode klopt niet meer (bv. na een codewijziging) — log even uit en opnieuw in, en probeer dan opnieuw.'
+      : friendlyError(error);
+    btn.disabled = false; btn.textContent = wantPause ? 'Pauzeren' : 'Hervatten'; return;
+  }
   showToast(wantPause ? 'Wachtrij gepauzeerd.' : 'Wachtrij hervat.');
   render();
 }
