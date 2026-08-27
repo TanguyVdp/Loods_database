@@ -1337,6 +1337,15 @@ function klantDetailView(k, klantLog){
 
   const klantLogPaged = paginateList(klantLog, `klant-${k.id}`);
   const entries = klantLogPaged.pageItems.map(e => {
+    if(e.kind === 'correctie'){
+      return `<div class="entry correctie">
+        <div class="ts">${fmtTs(e.ts)}</div>
+        <div class="desc">Klant gecorrigeerd door Boss
+          <span class="sub">${escapeHtml(e.note || '')}</span>
+        </div>
+        <div class="delta">✎</div>
+      </div>`;
+    }
     if(e.kind === 'levering'){
       return `<div class="entry ophalen">
         <div class="ts">${fmtTs(e.ts)}</div>
@@ -1715,9 +1724,24 @@ function bossView(allLog, allCustLog, loodsBaseline){
     })),
     ...allCustLog.map(e => {
       const klant = getKlant(e.customer_id);
+      const klantNaam = klant ? escapeHtml(klant.name) : 'verwijderde klant';
+      if(e.kind === 'correctie'){
+        return {
+          ts: e.ts, person: e.by_user_name, cls: 'correctie',
+          label: `corrigeerde klant <b>${klantNaam}</b> <span class="sub">${escapeHtml(e.note || '')}</span>`,
+          delta: '✎'
+        };
+      }
+      if(e.kind === 'levering'){
+        return {
+          ts: e.ts, person: e.by_user_name, cls: 'ophalen',
+          label: `verkocht ${e.amount} aan <b>${klantNaam}</b> à €${fmtPrice(e.price_per_unit)}/stuk <span class="sub">omzet: €${fmtPrice(e.total_price)}</span>`,
+          delta: `€${fmtPrice(e.total_price)}`
+        };
+      }
       return {
         ts: e.ts, person: e.by_user_name, cls: 'levering',
-        label: `leverde ${e.amount} aan <b>${escapeHtml(klant ? klant.name : 'verwijderde klant')}</b> <span class="sub">totaal klant ${e.cumulative_after} · +${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'} meegekregen</span>`,
+        label: `swapte ${e.amount} aan <b>${klantNaam}</b> <span class="sub">totaal klant ${e.cumulative_after} · +${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'} meegekregen</span>`,
         delta: `+${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'}`
       };
     })
@@ -1844,6 +1868,7 @@ function bossView(allLog, allCustLog, loodsBaseline){
           <td class="num">${fmtNum(c.total_verkocht||0)}</td>
           <td class="num" style="color:var(--violet);">€${fmtPrice(c.total_omzet||0)}</td>
           <td style="text-align:right;white-space:nowrap;">
+            <button class="btn secondary small" data-edit-klant="${c.id}" style="margin-right:6px;">${ICONS.gear}Bewerken</button>
             <button class="btn danger small" data-del-klant="${c.id}" data-del-klant-name="${escapeHtml(c.name)}">${ICONS.trash}Verwijderen</button>
           </td>
         </tr>`).join('')}</tbody>
@@ -1962,6 +1987,56 @@ function editUserDataModal(userId, userName, curIngelegd, curOpgehaald, curLegac
   };
 }
 
+function editKlantDataModal(k){
+  showModal(`<div class="modal">
+    <h3>Klant bewerken — ${escapeHtml(k.name)}</h3>
+    <p class="hint">Overschrijft deze waarden rechtstreeks — gebruik dit enkel voor correcties. De wijziging wordt gelogd zodat er een spoor van blijft.</p>
+    <label for="ekD-name">Naam</label>
+    <input type="text" id="ekD-name" maxlength="60" value="${escapeHtml(k.name)}">
+    <label for="ekD-groep">Groep</label>
+    <input type="text" id="ekD-groep" maxlength="40" value="${escapeHtml(k.groep || '')}">
+    <label for="ekD-phone">Telefoon</label>
+    <input type="text" id="ekD-phone" maxlength="30" value="${escapeHtml(k.phone || '')}">
+    <label for="ekD-geleverd">Geswapt (totaal)</label>
+    <input type="number" id="ekD-geleverd" min="0" value="${k.total_geleverd}">
+    <label for="ekD-verkocht">Verkocht (totaal)</label>
+    <input type="number" id="ekD-verkocht" min="0" value="${k.total_verkocht || 0}">
+    <label for="ekD-omzet">Omzet (€)</label>
+    <input type="number" id="ekD-omzet" min="0" step="0.01" value="${k.total_omzet || 0}">
+    <div class="err" id="ekD-err"></div>
+    <div class="row-btns">
+      <button class="btn secondary" id="ekD-cancel" style="flex:1">Annuleren</button>
+      <button class="btn boss" id="ekD-ok" style="flex:1">Opslaan</button>
+    </div>
+  </div>`);
+  document.getElementById('ekD-cancel').onclick = closeModal;
+  document.getElementById('ekD-ok').onclick = async () => {
+    const name = document.getElementById('ekD-name').value.trim();
+    const groep = document.getElementById('ekD-groep').value.trim();
+    const phone = document.getElementById('ekD-phone').value.trim();
+    const geleverd = parseInt(document.getElementById('ekD-geleverd').value, 10);
+    const verkocht = parseInt(document.getElementById('ekD-verkocht').value, 10);
+    const omzet = parseFloat(document.getElementById('ekD-omzet').value);
+    const err = document.getElementById('ekD-err');
+    if(!name){ err.textContent = 'Geef een naam op.'; return; }
+    if(isNaN(geleverd) || geleverd < 0 || isNaN(verkocht) || verkocht < 0 || isNaN(omzet) || omzet < 0){
+      err.textContent = 'Voer overal een geldig getal (0 of meer) in.'; return;
+    }
+    const btn = document.getElementById('ekD-ok');
+    btn.disabled = true; btn.textContent = 'Bezig…';
+    const me = getUser(session);
+    const { error } = await sb.rpc('fn_boss_set_klant_data', {
+      p_customer_id: k.id, p_name: name, p_groep: groep || null, p_phone: phone || null,
+      p_total_geleverd: geleverd, p_total_verkocht: verkocht, p_total_omzet: omzet,
+      p_boss_pin_hash: bossPinHash(), p_set_by: me ? me.name : null
+    });
+    if(error){ err.textContent = friendlyError(error); btn.disabled = false; btn.textContent = 'Opslaan'; return; }
+    closeModal();
+    showToast(`Klant "${name}" bijgewerkt.`);
+    render();
+  };
+}
+
 async function saveBossOrder(ids){
   const { error } = await sb.rpc('fn_boss_set_order', { p_order: ids, p_boss_pin_hash: bossPinHash() });
   if(error){ showToast(friendlyError(error), 'error'); render(); return; }
@@ -2031,6 +2106,12 @@ function attachBossHandlers(){
   document.querySelectorAll('[data-del-klant]').forEach(el=>{
     el.addEventListener('click', () => {
       deleteKlantFromBoss(el.getAttribute('data-del-klant'), el.getAttribute('data-del-klant-name'));
+    });
+  });
+  document.querySelectorAll('[data-edit-klant]').forEach(el=>{
+    el.addEventListener('click', () => {
+      const k = cache.customers.find(x => x.id === el.getAttribute('data-edit-klant'));
+      if(k) editKlantDataModal(k);
     });
   });
   document.querySelectorAll('[data-reset-pin]').forEach(el=>{
