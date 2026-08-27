@@ -1181,7 +1181,7 @@ function dashboardView(allInlegLog, baseline){
     ${navTabsHtml('loods')}
 
     <div class="who">
-      <div class="name"><button class="who-avatar-btn" data-edit-avatar="1" title="Profielfoto wijzigen">${avatarCircleHtml(me, 26)}</button>${escapeHtml(me.name)}<span><b class="tegoed">${myTegoed}</b>&nbsp;zakje${myTegoed===1?'':'s'} tegoed op dit moment</span></div>
+      <div class="name"><button class="who-avatar-btn" data-edit-avatar="1" title="Profielfoto wijzigen">${avatarCircleHtml(me, 26)}</button>${escapeHtml(me.name)}<span><b class="tegoed">${myTegoed}</b>&nbsp;zakje${myTegoed===1?'':'s'} momenteel tegoed</span></div>
       <button class="btn secondary who-logout" data-logout="1">Uitloggen</button>
     </div>
 
@@ -1213,7 +1213,7 @@ function dashboardView(allInlegLog, baseline){
 
       <div class="card">
         <h2>${ICONS.arrowDown}Zakjes ophalen</h2>
-        <p class="hint">Je hebt nu <b class="mono" style="color:var(--lime)">${myTegoed}</b> zakje${myTegoed===1?'':'s'} tegoed. Registreer hier hoeveel je meeneemt zodat iedereen kan zien wat er nog in de loods ligt.</p>
+        <p class="hint">Je hebt nu <b class="mono" style="color:var(--lime)">${myTegoed}</b> zakje${myTegoed===1?'':'s'} momenteel tegoed. Registreer hier hoeveel je meeneemt zodat iedereen kan zien wat er nog in de loods ligt.</p>
         <label for="out-amount">Aantal zakjes ophalen</label>
         <input type="number" id="out-amount" min="1" step="1" max="${myTegoed}" placeholder="bv. 20" ${myTegoed<=0?'disabled':''}>
         <div style="margin-top:14px;"><button class="btn block secondary" id="out-submit" ${myTegoed<=0?'disabled':''}>Ophalen registreren</button></div>
