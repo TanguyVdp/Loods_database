@@ -1225,8 +1225,9 @@ function dashboardView(allInlegLog, baseline){
         <h2>${ICONS.arrowDown}Zakjes ophalen</h2>
         <p class="hint">Je hebt nu <b class="mono" style="color:var(--lime)">${myMomenteelTegoed}</b> zakje${myMomenteelTegoed===1?'':'s'} momenteel tegoed — enkel wat de wachtrij al écht verwerkt heeft, dus dit kan lager liggen dan je totale toegekende tegoed als een deel nog in verwerking is. Je totale tegoed is wel <b class="mono" style="color:var(--lime)">${myTegoed}</b> zakje${myTegoed===1?'':'s'}.</p>
         <label for="out-amount">Aantal zakjes ophalen</label>
-        <input type="number" id="out-amount" min="1" step="1" max="${myMomenteelTegoed}" placeholder="bv. 20" ${myMomenteelTegoed<=0?'disabled':''}>
-        <div style="margin-top:14px;"><button class="btn block secondary" id="out-submit" ${myMomenteelTegoed<=0?'disabled':''}>Ophalen registreren</button></div>
+        <input type="number" id="out-amount" min="1" step="1" placeholder="bv. 20">
+        <div class="preview" id="out-preview"></div>
+        <div style="margin-top:14px;"><button class="btn block secondary" id="out-submit">Ophalen registreren</button></div>
         <div class="err" id="out-err"></div>
       </div>
     </div>
@@ -1797,6 +1798,7 @@ function bossView(allLog, allCustLog, loodsBaseline){
           <p class="hint" id="boss-reg-out-hint"></p>
           <label for="boss-reg-out-amount">Aantal zakjes ophalen</label>
           <input type="number" id="boss-reg-out-amount" min="1" step="1" placeholder="bv. 20">
+          <div class="preview" id="boss-reg-out-preview"></div>
           <div style="margin-top:14px;"><button class="btn boss block" id="boss-reg-out-submit">Ophalen registreren</button></div>
           <div class="err" id="boss-reg-out-err"></div>
         </div>
@@ -2005,13 +2007,26 @@ function attachBossHandlers(){
       if(!u) return;
       const z = zakjesVoor(u);
       const tegoed = z - u.opgehaald;
-      const momenteelInleg = momenteelInlegVoorPersoon(u, verwerkteZakjesPerPersoon(lastQueueResult));
+      const verwerktPerPersoonBoss = verwerkteZakjesPerPersoon(lastQueueResult);
+      const momenteelInleg = momenteelInlegVoorPersoon(u, verwerktPerPersoonBoss);
       const ruimte = Math.max(0, MAX_MOMENTEEL_INLEG - momenteelInleg);
+      const momenteelTegoedBoss = Math.max(0, totaalVerwerktVoorPersoon(u, verwerktPerPersoonBoss) - u.opgehaald);
       document.getElementById('boss-reg-in-hint').innerHTML = `Wordt opgeteld bij ${escapeHtml(u.name)}'s totaal (${fmtNum(u.total_ingelegd)} nu) — elke ${RATIO_IN} planten leveren ${RATIO_OUT} zakje op. Max ${fmtNum(MAX_MOMENTEEL_INLEG)} onverwerkt per persoon — ${escapeHtml(u.name)} heeft er nu ${fmtNum(momenteelInleg)}, dus nog ruimte voor <b style="color:var(--lime)">${fmtNum(ruimte)}</b>.`;
-      document.getElementById('boss-reg-out-hint').innerHTML = `${escapeHtml(u.name)} heeft nu <b class="mono" style="color:var(--lime)">${fmtNum(tegoed)}</b> zakje${tegoed===1?'':'s'} tegoed.`;
+      document.getElementById('boss-reg-out-hint').innerHTML = `${escapeHtml(u.name)} heeft nu <b class="mono" style="color:var(--lime)">${fmtNum(momenteelTegoedBoss)}</b> zakje${momenteelTegoedBoss===1?'':'s'} momenteel tegoed (echt verwerkt) — totaal toegekend tegoed: ${fmtNum(tegoed)}.`;
+      const outAmountBoss = document.getElementById('boss-reg-out-amount');
+      if(outAmountBoss) outAmountBoss.dataset.maxTegoed = momenteelTegoedBoss;
     };
     updateRegHints();
     regPersonSel.addEventListener('change', updateRegHints);
+    const outPreviewBoss = document.getElementById('boss-reg-out-preview');
+    document.getElementById('boss-reg-out-amount').addEventListener('input', (e) => {
+      const v = parseInt(e.target.value, 10);
+      const maxT = parseInt(e.target.dataset.maxTegoed || '0', 10);
+      if(!v || v <= 0){ outPreviewBoss.innerHTML=''; return; }
+      outPreviewBoss.innerHTML = v > maxT
+        ? `<span class="err">Kan niet — maar <b>${fmtNum(maxT)}</b> zakje${maxT===1?'':'s'} echt verwerkt (rest nog in verwerking).</span>`
+        : '';
+    });
 
     document.getElementById('boss-reg-in-submit').addEventListener('click', async () => {
       const uid = regPersonSel.value;
@@ -2154,11 +2169,23 @@ function attachDashboardHandlers(){
 
   const outAmount = document.getElementById('out-amount');
   if(outAmount){
+    const outPreview = document.getElementById('out-preview');
     if(paused){
       outAmount.disabled = true;
       document.getElementById('out-submit').disabled = true;
       document.getElementById('out-err').innerHTML = '<span>De loods is tijdelijk gepauzeerd voor onderhoud — even geduld.</span>';
     }
+    outAmount.addEventListener('input', () => {
+      const v = parseInt(outAmount.value, 10);
+      if(!v || v <= 0){ outPreview.innerHTML=''; return; }
+      const me = getUser(session);
+      const maxTegoed = Math.max(0, totaalVerwerktVoorPersoon(me, verwerkteZakjesPerPersoon(lastQueueResult)) - me.opgehaald);
+      if(v > maxTegoed){
+        outPreview.innerHTML = `<span class="err">Kan niet — je hebt momenteel maar <b>${fmtNum(maxTegoed)}</b> zakje${maxTegoed===1?'':'s'} echt verwerkt liggen (de rest is nog in verwerking).</span>`;
+        return;
+      }
+      outPreview.innerHTML = '';
+    });
     document.getElementById('out-submit').addEventListener('click', async () => {
       const v = parseInt(outAmount.value, 10);
       const err = document.getElementById('out-err');
