@@ -341,6 +341,7 @@ const RATIO_IN = 2, RATIO_OUT = 1;             // leden: 2 planten -> 1 zakje (l
 // OUDE ratio — deze constante blijft die oude waarde, los van RATIO_IN.
 const LEGACY_RATIO_IN = 3;
 const KLANT_RATIO_IN = 4, KLANT_RATIO_OUT = 1; // klanten: 4 geleverd -> 1 zakje
+const MAX_MOMENTEEL_INLEG = 4000; // max planten per persoon tegelijk onverwerkt in de loods
 const MAX_USERS = 25;
 const SESSION_KEY = "loods25-session";
 const BOSS_KEY = "wietloods-boss-session";
@@ -379,6 +380,7 @@ const ERR_MESSAGES = {
   ONGELDIG_AANTAL: 'Voer een geldig aantal in.',
   ONVOLDOENDE_TEGOED: 'Onvoldoende tegoed.',
   NOG_NIET_VERWERKT: 'Deze zakjes zijn nog niet verwerkt door de wachtrij — probeer het later opnieuw.',
+  MAX_ONVERWERKT_BEREIKT: `Max ${MAX_MOMENTEEL_INLEG} planten per persoon tegelijk onverwerkt in de loods — je zit al aan (of over) die grens, wacht tot er meer verwerkt is.`,
   KLANT_BESTAAT_AL: 'Die klant bestaat al.',
   KLANT_NIET_GEVONDEN: 'Klant niet gevonden.',
   ONJUISTE_BOSSCODE: 'Bosscode klopt niet meer — ontgrendel opnieuw.',
@@ -1135,6 +1137,8 @@ function dashboardView(allInlegLog, baseline){
   // verwerkt heeft, niet het volledige instant-toegekende tegoed — anders
   // zou je kunnen "ophalen" wat fysiek nog niet klaar is
   const myMomenteelTegoed = Math.max(0, totaalVerwerktVoorPersoon(me, verwerktPerPersoon) - me.opgehaald);
+  const myMomenteelInleg = momenteelInlegVoorPersoon(me, verwerktPerPersoon);
+  const myInlegRuimte = Math.max(0, MAX_MOMENTEEL_INLEG - myMomenteelInleg);
   const rows = [...cache.users].sort((a,b)=> (zakjesVoor(b)-b.opgehaald) - (zakjesVoor(a)-a.opgehaald))
     .map(u => {
       const z = zakjesVoor(u);
@@ -1209,10 +1213,11 @@ function dashboardView(allInlegLog, baseline){
       <div class="card">
         <h2>${ICONS.sprout}Planten inleggen</h2>
         <p class="hint">Geef door hoeveel planten je in de loods hebt gelegd. Wordt meteen opgeteld bij het totaal (${me.total_ingelegd} nu) en omgerekend: <b>elke ${RATIO_IN} planten leveren ${RATIO_OUT} zakje op, dus ${RATIO_IN}/${RATIO_OUT}</b>.</p>
+        <p class="hint">Max <b>${fmtNum(MAX_MOMENTEEL_INLEG)}</b> planten per persoon tegelijk onverwerkt in de loods — jij hebt er nu <b class="mono" style="color:var(--cream)">${fmtNum(myMomenteelInleg)}</b> liggen, dus nog ruimte voor <b class="mono" style="color:var(--lime)">${fmtNum(myInlegRuimte)}</b>. Die ruimte groeit vanzelf weer aan naarmate de wachtrij verwerkt.</p>
         <label for="in-amount">Aantal planten</label>
-        <input type="number" id="in-amount" min="1" step="1" placeholder="bv. 120">
+        <input type="number" id="in-amount" min="1" step="1" max="${myInlegRuimte}" placeholder="bv. 120" ${myInlegRuimte<=0?'disabled':''}>
         <div class="preview" id="in-preview"></div>
-        <div style="margin-top:14px;"><button class="btn block" id="in-submit">Inleg registreren</button></div>
+        <div style="margin-top:14px;"><button class="btn block" id="in-submit" ${myInlegRuimte<=0?'disabled':''}>Inleg registreren</button></div>
         <div class="err" id="in-err"></div>
       </div>
 
@@ -2000,7 +2005,9 @@ function attachBossHandlers(){
       if(!u) return;
       const z = zakjesVoor(u);
       const tegoed = z - u.opgehaald;
-      document.getElementById('boss-reg-in-hint').innerHTML = `Wordt opgeteld bij ${escapeHtml(u.name)}'s totaal (${fmtNum(u.total_ingelegd)} nu) — elke ${RATIO_IN} planten leveren ${RATIO_OUT} zakje op.`;
+      const momenteelInleg = momenteelInlegVoorPersoon(u, verwerkteZakjesPerPersoon(lastQueueResult));
+      const ruimte = Math.max(0, MAX_MOMENTEEL_INLEG - momenteelInleg);
+      document.getElementById('boss-reg-in-hint').innerHTML = `Wordt opgeteld bij ${escapeHtml(u.name)}'s totaal (${fmtNum(u.total_ingelegd)} nu) — elke ${RATIO_IN} planten leveren ${RATIO_OUT} zakje op. Max ${fmtNum(MAX_MOMENTEEL_INLEG)} onverwerkt per persoon — ${escapeHtml(u.name)} heeft er nu ${fmtNum(momenteelInleg)}, dus nog ruimte voor <b style="color:var(--lime)">${fmtNum(ruimte)}</b>.`;
       document.getElementById('boss-reg-out-hint').innerHTML = `${escapeHtml(u.name)} heeft nu <b class="mono" style="color:var(--lime)">${fmtNum(tegoed)}</b> zakje${tegoed===1?'':'s'} tegoed.`;
     };
     updateRegHints();
@@ -2011,7 +2018,9 @@ function attachBossHandlers(){
       const v = parseInt(document.getElementById('boss-reg-in-amount').value, 10);
       const err = document.getElementById('boss-reg-in-err');
       if(!v || v <= 0){ err.textContent = 'Voer een geldig aantal planten in.'; return; }
-      const { error } = await sb.rpc('fn_register_inleg', { p_user_id: uid, p_amount: v });
+      const uIn = cache.users.find(x => x.id === uid);
+      const momenteelInlegIn = uIn ? momenteelInlegVoorPersoon(uIn, verwerkteZakjesPerPersoon(lastQueueResult)) : 0;
+      const { error } = await sb.rpc('fn_register_inleg', { p_user_id: uid, p_amount: v, p_huidig_momenteel_inleg: momenteelInlegIn });
       if(error){ err.textContent = friendlyError(error); return; }
       const u = cache.users.find(x => x.id === uid);
       showToast(`Inleg geregistreerd voor ${u ? u.name : ''}: +${v} planten.`);
@@ -2119,6 +2128,12 @@ function attachDashboardHandlers(){
       const v = parseInt(inAmount.value, 10);
       if(!v || v <= 0){ preview.innerHTML=''; return; }
       const me = getUser(session);
+      const momenteelInleg = momenteelInlegVoorPersoon(me, verwerkteZakjesPerPersoon(lastQueueResult));
+      const ruimte = Math.max(0, MAX_MOMENTEEL_INLEG - momenteelInleg);
+      if(v > ruimte){
+        preview.innerHTML = `<span class="err">Kan niet — max ${fmtNum(MAX_MOMENTEEL_INLEG)} planten tegelijk onverwerkt per persoon. Je hebt nog ruimte voor <b>${fmtNum(ruimte)}</b>.</span>`;
+        return;
+      }
       const newTotal = me.total_ingelegd + v;
       const newZakjes = zakjesForTotal(me.legacy_zakjes || 0, newTotal);
       const delta = newZakjes - zakjesVoor(me);
@@ -2128,7 +2143,9 @@ function attachDashboardHandlers(){
       const v = parseInt(inAmount.value, 10);
       const err = document.getElementById('in-err');
       if(!v || v <= 0){ err.textContent = 'Voer een geldig aantal planten in.'; return; }
-      const { error } = await sb.rpc('fn_register_inleg', { p_user_id: session, p_amount: v });
+      const me = getUser(session);
+      const momenteelInleg = momenteelInlegVoorPersoon(me, verwerkteZakjesPerPersoon(lastQueueResult));
+      const { error } = await sb.rpc('fn_register_inleg', { p_user_id: session, p_amount: v, p_huidig_momenteel_inleg: momenteelInleg });
       if(error){ err.textContent = friendlyError(error); return; }
       showToast(`Inleg geregistreerd: +${v} planten.`);
       render();
