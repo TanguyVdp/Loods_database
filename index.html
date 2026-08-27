@@ -1169,13 +1169,20 @@ function dashboardView(allInlegLog, baseline){
       </tr>`;
     }).join('');
 
+  const liveTotaalZakjesInLoods = zakjesKlaarInLoods(queueResult, cache.users);
+  const logExtraInfo = (e) => {
+    const u = cache.users.find(x => x.id === e.user_id);
+    const persoonlijk = u ? Math.max(0, totaalVerwerktVoorPersoon(u, verwerktPerPersoon) - u.opgehaald) : 0;
+    return ` · nu ${fmtNum(liveTotaalZakjesInLoods)} zakjes totaal in loods (${fmtNum(persoonlijk)} van ${u ? escapeHtml(u.name) : escapeHtml(e.user_name)})`;
+  };
+
   const dashLogPage = paginateList(cache.log, 'dashboard');
   const logEntries = dashLogPage.pageItems.map(e => {
     if(e.type === 'inleg'){
       return `<div class="entry inleg">
         <div class="ts">${fmtTs(e.ts)}</div>
         <div class="desc">${personDot(e.user_name)}<b>${escapeHtml(e.user_name)}</b> legde ${e.amount} planten in
-          <span class="sub">totaal ${e.cumulative_after} planten · zakjes toegekend: ${e.zakjes_after}</span>
+          <span class="sub">totaal ${e.cumulative_after} planten · zakjes toegekend: ${e.zakjes_after}${logExtraInfo(e)}</span>
         </div>
         <div class="delta">+${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'}</div>
       </div>`;
@@ -1184,7 +1191,7 @@ function dashboardView(allInlegLog, baseline){
       return `<div class="entry correctie">
         <div class="ts">${fmtTs(e.ts)}</div>
         <div class="desc">${personDot(e.user_name)}<b>${escapeHtml(e.user_name)}</b> — profiel gecorrigeerd door Boss
-          <span class="sub">${escapeHtml(e.note || '')}</span>
+          <span class="sub">${escapeHtml(e.note || '')}${logExtraInfo(e)}</span>
         </div>
         <div class="delta">✎</div>
       </div>`;
@@ -1192,7 +1199,7 @@ function dashboardView(allInlegLog, baseline){
     return `<div class="entry ophalen">
       <div class="ts">${fmtTs(e.ts)}</div>
       <div class="desc">${personDot(e.user_name)}<b>${escapeHtml(e.user_name)}</b> haalde zakjes op
-        <span class="sub">resterend tegoed: ${e.tegoed_after}</span>
+        <span class="sub">resterend tegoed: ${e.tegoed_after}${logExtraInfo(e)}</span>
       </div>
       <div class="delta">−${e.amount} zakje${e.amount===1?'':'s'}</div>
     </div>`;
@@ -1686,14 +1693,24 @@ function bossView(allLog, allCustLog, loodsBaseline){
   // zo blijft de sleep-volgorde uit "Overzicht per persoon" behouden.
   const persons = cache.users.map(u => u.name);
 
+  const bossQueueResult = computeQueueTimeline(buildPostCutoverLog(allLog, cache.users, loodsBaseline.ratio_cutover_at), loodsBaseline.batch_size, loodsBaseline.batch_minutes, loodsBaseline.offset_minutes);
+  lastQueueResult = bossQueueResult; // zodat het registratieformulier hieronder het correcte, actuele momenteel-tegoed kan controleren
+  const bossVerwerktPerPersoon = verwerkteZakjesPerPersoon(bossQueueResult);
+  const bossLiveTotaalZakjesInLoods = zakjesKlaarInLoods(bossQueueResult, cache.users);
+  const bossLogExtraInfo = (userId, userName) => {
+    const u = cache.users.find(x => x.id === userId);
+    const persoonlijk = u ? Math.max(0, totaalVerwerktVoorPersoon(u, bossVerwerktPerPersoon) - u.opgehaald) : 0;
+    return ` · nu ${fmtNum(bossLiveTotaalZakjesInLoods)} zakjes totaal in loods (${fmtNum(persoonlijk)} van ${u ? escapeHtml(u.name) : escapeHtml(userName)})`;
+  };
+
   bossMerged = [
     ...allLog.map(e => ({
       ts: e.ts, person: e.user_name, cls: e.type,
       label: e.type === 'inleg'
-        ? `legde ${e.amount} planten in <span class="sub">totaal ${e.cumulative_after} · zakjes toegekend: ${e.zakjes_after}</span>`
+        ? `legde ${e.amount} planten in <span class="sub">totaal ${e.cumulative_after} · zakjes toegekend: ${e.zakjes_after}${bossLogExtraInfo(e.user_id, e.user_name)}</span>`
         : e.type === 'correctie'
-          ? `profiel gecorrigeerd door Boss <span class="sub">${escapeHtml(e.note || '')}</span>`
-          : `haalde ${e.amount} zakje${e.amount===1?'':'s'} op <span class="sub">resterend tegoed: ${e.tegoed_after}</span>`,
+          ? `profiel gecorrigeerd door Boss <span class="sub">${escapeHtml(e.note || '')}${bossLogExtraInfo(e.user_id, e.user_name)}</span>`
+          : `haalde ${e.amount} zakje${e.amount===1?'':'s'} op <span class="sub">resterend tegoed: ${e.tegoed_after}${bossLogExtraInfo(e.user_id, e.user_name)}</span>`,
       delta: e.type === 'inleg' ? `+${e.zakjes_delta} zakje${e.zakjes_delta===1?'':'s'}` : e.type === 'correctie' ? '✎' : `−${e.amount} zakje${e.amount===1?'':'s'}`
     })),
     ...allCustLog.map(e => {
@@ -1705,10 +1722,6 @@ function bossView(allLog, allCustLog, loodsBaseline){
       };
     })
   ].sort((a,b) => new Date(b.ts) - new Date(a.ts));
-
-  const bossQueueResult = computeQueueTimeline(buildPostCutoverLog(allLog, cache.users, loodsBaseline.ratio_cutover_at), loodsBaseline.batch_size, loodsBaseline.batch_minutes, loodsBaseline.offset_minutes);
-  lastQueueResult = bossQueueResult; // zodat het registratieformulier hieronder het correcte, actuele momenteel-tegoed kan controleren
-  const bossVerwerktPerPersoon = verwerkteZakjesPerPersoon(bossQueueResult);
   const summary = persons.map(name => {
     const u = cache.users.find(x => x.name === name);
     const geleverd = allCustLog.filter(e => e.by_user_name === name).reduce((s,e)=>s+e.amount, 0);
