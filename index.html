@@ -1186,7 +1186,7 @@ function dashboardView(allInlegLog, baseline){
     ${navTabsHtml('loods')}
 
     <div class="who">
-      <div class="name"><button class="who-avatar-btn" data-edit-avatar="1" title="Profielfoto wijzigen">${avatarCircleHtml(me, 26)}</button>${escapeHtml(me.name)}<span><b class="tegoed">${myMomenteelTegoed}</b>&nbsp;zakje${myMomenteelTegoed===1?'':'s'} momenteel tegoed</span></div>
+      <div class="name"><button class="who-avatar-btn" data-edit-avatar="1" title="Profielfoto wijzigen">${avatarCircleHtml(me, 26)}</button>${escapeHtml(me.name)}<span><b class="tegoed">${myMomenteelTegoed}</b>&nbsp;zakje${myMomenteelTegoed===1?'':'s'} momenteel tegoed — totaal <b class="tegoed">${myTegoed}</b>&nbsp;zakje${myTegoed===1?'':'s'} tegoed</span></div>
       <button class="btn secondary who-logout" data-logout="1">Uitloggen</button>
     </div>
 
