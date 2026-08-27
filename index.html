@@ -342,6 +342,13 @@ const RATIO_IN = 2, RATIO_OUT = 1;             // leden: 2 planten -> 1 zakje (l
 const LEGACY_RATIO_IN = 3;
 const KLANT_RATIO_IN = 4, KLANT_RATIO_OUT = 1; // klanten: 4 geleverd -> 1 zakje
 const MAX_MOMENTEEL_INLEG = 4000; // max planten per persoon tegelijk onverwerkt in de loods
+// kleurt oplopend richting de limiet: null = normaal, anders een CSS-kleur
+function momenteelInlegKleur(value){
+  const ratio = value / MAX_MOMENTEEL_INLEG;
+  if(ratio >= 1) return 'var(--danger)';
+  if(ratio >= 0.75) return 'var(--warn)';
+  return null;
+}
 const MAX_USERS = 25;
 const SESSION_KEY = "loods25-session";
 const BOSS_KEY = "wietloods-boss-session";
@@ -601,7 +608,13 @@ function updateLoodsStatTile(){
     const verwerktPerPersoon = verwerkteZakjesPerPersoon(lastQueueResult);
     cache.users.forEach(u => {
       const c1 = document.querySelector(`[data-momenteel-inleg="${u.id}"]`);
-      if(c1) c1.textContent = fmtNum(momenteelInlegVoorPersoon(u, verwerktPerPersoon));
+      if(c1){
+        const mi = momenteelInlegVoorPersoon(u, verwerktPerPersoon);
+        c1.textContent = fmtNum(mi);
+        const kleur = momenteelInlegKleur(mi);
+        c1.style.color = kleur || '';
+        c1.style.fontWeight = kleur ? '700' : '';
+      }
       const c2 = document.querySelector(`[data-momenteel-tegoed="${u.id}"]`);
       if(c2) c2.textContent = fmtNum(Math.max(0, totaalVerwerktVoorPersoon(u, verwerktPerPersoon) - u.opgehaald));
     });
@@ -1148,7 +1161,7 @@ function dashboardView(allInlegLog, baseline){
       return `<tr class="${u.id===me.id?'me':''}">
         <td>${personDot(u.name)}${escapeHtml(u.name)}</td>
         <td class="num">${fmtNum(u.total_ingelegd)}</td>
-        <td class="num" data-momenteel-inleg="${u.id}">${fmtNum(momenteelInleg)}</td>
+        <td class="num" data-momenteel-inleg="${u.id}" style="${momenteelInlegKleur(momenteelInleg) ? `color:${momenteelInlegKleur(momenteelInleg)};font-weight:700;` : ''}">${fmtNum(momenteelInleg)}</td>
         <td class="num">${fmtNum(z)}</td>
         <td class="num">${fmtNum(u.opgehaald)}</td>
         <td class="num" data-momenteel-tegoed="${u.id}">${fmtNum(momenteelTegoed)}</td>
@@ -1213,7 +1226,8 @@ function dashboardView(allInlegLog, baseline){
       <div class="card">
         <h2>${ICONS.sprout}Planten inleggen</h2>
         <p class="hint">Geef door hoeveel planten je in de loods hebt gelegd. Wordt meteen opgeteld bij het totaal (${me.total_ingelegd} nu) en omgerekend: <b>elke ${RATIO_IN} planten leveren ${RATIO_OUT} zakje op, dus ${RATIO_IN}/${RATIO_OUT}</b>.</p>
-        <p class="hint">Max <b>${fmtNum(MAX_MOMENTEEL_INLEG)}</b> planten per persoon tegelijk onverwerkt in de loods — jij hebt er nu <b class="mono" style="color:var(--cream)">${fmtNum(myMomenteelInleg)}</b> liggen, dus nog ruimte voor <b class="mono" style="color:var(--lime)">${fmtNum(myInlegRuimte)}</b>. Die ruimte groeit vanzelf weer aan naarmate de wachtrij verwerkt.</p>
+        <p class="hint">Max <b>${fmtNum(MAX_MOMENTEEL_INLEG)}</b> planten per persoon tegelijk onverwerkt in de loods — jij hebt er nu <b class="mono" style="color:${momenteelInlegKleur(myMomenteelInleg) || 'var(--cream)'}">${fmtNum(myMomenteelInleg)}</b> liggen, dus nog ruimte voor <b class="mono" style="color:var(--lime)">${fmtNum(myInlegRuimte)}</b>. Die ruimte groeit vanzelf weer aan naarmate de wachtrij verwerkt.</p>
+        ${momenteelInlegKleur(myMomenteelInleg) ? `<p class="hint" style="color:${momenteelInlegKleur(myMomenteelInleg)};">⚠️ ${myInlegRuimte<=0 ? 'Je zit aan (of over) de limiet — je kan nu niks bijleggen tot er ruimte vrijkomt.' : `Je zit al op ${fmtNum(myMomenteelInleg)}/${fmtNum(MAX_MOMENTEEL_INLEG)} — nog maar weinig ruimte over.`}</p>` : ''}
         <label for="in-amount">Aantal planten</label>
         <input type="number" id="in-amount" min="1" step="1" max="${myInlegRuimte}" placeholder="bv. 120" ${myInlegRuimte<=0?'disabled':''}>
         <div class="preview" id="in-preview"></div>
@@ -1729,7 +1743,7 @@ function bossView(allLog, allCustLog, loodsBaseline){
           <td style="width:1%;">${s.id ? `<span class="drag-handle" data-drag-handle="1" title="Sleep om te herschikken">${ICONS.grip}</span>` : ''}</td>
           <td>${personDot(s.name)}${escapeHtml(s.name)}</td>
           <td class="num">${fmtNum(s.ingelegd)}</td>
-          <td class="num">${fmtNum(s.momenteelInleg)}</td>
+          <td class="num" style="${momenteelInlegKleur(s.momenteelInleg) ? `color:${momenteelInlegKleur(s.momenteelInleg)};font-weight:700;` : ''}">${fmtNum(s.momenteelInleg)}${momenteelInlegKleur(s.momenteelInleg) ? ' ⚠️' : ''}</td>
           <td class="num">${fmtNum(s.zakjes)}</td>
           <td class="num">${fmtNum(s.opgehaald)}</td>
           <td class="num">${fmtNum(s.momenteelTegoed)}</td>
