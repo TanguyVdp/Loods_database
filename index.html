@@ -1832,6 +1832,24 @@ function bossView(allLog, allCustLog, loodsBaseline){
       </div>
     </div>
 
+    <div class="section-title"><h2>${ICONS.users}Klanten beheren</h2><span>${cache.customers.length} klanten</span></div>
+    <div class="card" style="padding:14px 20px;margin-bottom:20px;">
+      ${cache.customers.length === 0 ? '<div class="empty">Nog geen klanten aangemaakt.</div>' : `
+      <table>
+        <thead><tr><th>Naam</th><th>Groep</th><th class="num">Geswapt</th><th class="num">Verkocht</th><th class="num">Omzet</th><th></th></tr></thead>
+        <tbody>${[...cache.customers].sort((a,b)=>a.name.localeCompare(b.name)).map(c => `<tr>
+          <td>${escapeHtml(c.name)}</td>
+          <td>${c.groep ? `<span class="pill">${escapeHtml(c.groep)}</span>` : ''}</td>
+          <td class="num">${fmtNum(c.total_geleverd)}</td>
+          <td class="num">${fmtNum(c.total_verkocht||0)}</td>
+          <td class="num" style="color:var(--violet);">€${fmtPrice(c.total_omzet||0)}</td>
+          <td style="text-align:right;white-space:nowrap;">
+            <button class="btn danger small" data-del-klant="${c.id}" data-del-klant-name="${escapeHtml(c.name)}">${ICONS.trash}Verwijderen</button>
+          </td>
+        </tr>`).join('')}</tbody>
+      </table>`}
+    </div>
+
     ${(() => {
       const filtered = bossPersonFilter ? bossMerged.filter(e => e.person === bossPersonFilter) : bossMerged;
       const bossLogPaged = paginateList(filtered, 'boss');
@@ -1857,6 +1875,14 @@ async function deleteProfileFromBoss(userId, userName){
   const { error } = await sb.rpc('fn_delete_profile', { p_user_id: userId, p_boss_pin_hash: bossPinHash() });
   if(error){ showToast(friendlyError(error), 'error'); return; }
   showToast(`Profiel "${userName}" verwijderd.`);
+  render();
+}
+
+async function deleteKlantFromBoss(customerId, customerName){
+  if(!confirm(`Klant "${customerName}" verwijderen? De leverings-/verkoopgeschiedenis blijft bewaard (als "verwijderde klant"), enkel de klantfiche zelf verdwijnt. Dit kan niet ongedaan gemaakt worden.`)) return;
+  const { error } = await sb.rpc('fn_boss_delete_klant', { p_customer_id: customerId, p_boss_pin_hash: bossPinHash() });
+  if(error){ showToast(friendlyError(error), 'error'); return; }
+  showToast(`Klant "${customerName}" verwijderd.`);
   render();
 }
 
@@ -2000,6 +2026,11 @@ function attachBossHandlers(){
   document.querySelectorAll('[data-del-profile]').forEach(el=>{
     el.addEventListener('click', () => {
       deleteProfileFromBoss(el.getAttribute('data-del-profile'), el.getAttribute('data-del-name'));
+    });
+  });
+  document.querySelectorAll('[data-del-klant]').forEach(el=>{
+    el.addEventListener('click', () => {
+      deleteKlantFromBoss(el.getAttribute('data-del-klant'), el.getAttribute('data-del-klant-name'));
     });
   });
   document.querySelectorAll('[data-reset-pin]').forEach(el=>{
