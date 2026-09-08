@@ -341,7 +341,7 @@ const RATIO_IN = 2, RATIO_OUT = 1;             // leden: 2 planten -> 1 zakje (l
 // OUDE ratio — deze constante blijft die oude waarde, los van RATIO_IN.
 const LEGACY_RATIO_IN = 3;
 const KLANT_RATIO_IN = 4, KLANT_RATIO_OUT = 1; // klanten: 4 geleverd -> 1 zakje
-const MAX_MOMENTEEL_INLEG = 4000; // max planten per persoon tegelijk onverwerkt in de loods
+const MAX_MOMENTEEL_INLEG = 5000; // max planten per persoon tegelijk onverwerkt in de loods
 // kleurt oplopend richting de limiet: null = normaal, anders een CSS-kleur
 function momenteelInlegKleur(value){
   const ratio = value / MAX_MOMENTEEL_INLEG;
@@ -365,7 +365,8 @@ const LOODS_CONFIG_DEFAULT = {
   set_by: null,
   paused: false,
   paused_at: null,
-  ratio_cutover_at: null
+  ratio_cutover_at: null,
+  zakjes_correctie: 0
 };
 async function fetchLoodsBaseline(){
   const { data, error } = await sb.from('loods_baseline').select('*').eq('id', true).maybeSingle();
@@ -594,9 +595,16 @@ function plantenNogInLoods(result, users){
 // dit is dus wat er nu écht klaarligt om op te halen. Anders dan "nog tegoed"
 // (instant toegekend bij inleg, los van verwerkingstijd): dit houdt wel
 // rekening met de wachtrij-simulatie, en daalt zodra iemand ophaalt.
-function zakjesKlaarInLoods(result, users){
+// correctie: aparte, onafhankelijke verschuiving (loods_baseline.zakjes_correctie)
+// bovenop wat het wachtrij-model voorspelt — vult het model bij tot de
+// werkelijke fysieke voorraad in de gedeelde opslag, los van de planten-
+// kalibratie (die enkel offset_minutes rechttrekt). Standaard (geen 3e
+// argument) wordt de laatst geladen baseline gebruikt.
+function zakjesKlaarInLoods(result, users, correctie){
   const verwerktPerPersoon = verwerkteZakjesPerPersoon(result);
-  return users.reduce((s,u) => s + Math.max(0, totaalVerwerktVoorPersoon(u, verwerktPerPersoon) - u.opgehaald), 0);
+  const modelWaarde = users.reduce((s,u) => s + Math.max(0, totaalVerwerktVoorPersoon(u, verwerktPerPersoon) - u.opgehaald), 0);
+  const c = correctie !== undefined ? correctie : (lastLoodsBaseline.zakjes_correctie || 0);
+  return Math.max(0, modelWaarde + c);
 }
 function updateLoodsStatTile(){
   const el = document.getElementById('stat-planten-loods');
@@ -1704,6 +1712,7 @@ function bossView(allLog, allCustLog, loodsBaseline){
 
   const bossQueueResult = computeQueueTimeline(buildPostCutoverLog(allLog, cache.users, loodsBaseline.ratio_cutover_at), loodsBaseline.batch_size, loodsBaseline.batch_minutes, loodsBaseline.offset_minutes);
   lastQueueResult = bossQueueResult; // zodat het registratieformulier hieronder het correcte, actuele momenteel-tegoed kan controleren
+  lastLoodsBaseline = loodsBaseline; // zodat zakjesKlaarInLoods() ook hier de juiste zakjes_correctie gebruikt
   const bossVerwerktPerPersoon = verwerkteZakjesPerPersoon(bossQueueResult);
   const bossLiveTotaalZakjesInLoods = zakjesKlaarInLoods(bossQueueResult, cache.users);
   const bossLogExtraInfo = (userId, userName) => {
@@ -1801,12 +1810,17 @@ function bossView(allLog, allCustLog, loodsBaseline){
 
     <div class="section-title"><h2>${ICONS.clock}Wachtrij kalibreren</h2><span>enkel hier zichtbaar</span></div>
     <div class="card" style="margin-bottom:20px;">
-      <p class="hint">Vul in hoeveel er <b>op dit moment écht</b> in de loods ligt. De site berekent dan zelf hoeveel de klok van de hele wachtrij moet verschuiven zodat alle tijden (van iedereen) opnieuw kloppen — geen gaten of sprongen, alles schuift in dezelfde verhouding mee.</p>
-      <p class="hint">Huidige verschuiving: <b class="mono" style="color:var(--cream)">${loodsBaseline.offset_minutes >= 0 ? '+' : ''}${loodsBaseline.offset_minutes} min</b>, snelheid <b class="mono" style="color:var(--cream)">${loodsBaseline.batch_size}/${loodsBaseline.batch_minutes}min</b>${loodsBaseline.set_by ? ` — gezet door ${escapeHtml(loodsBaseline.set_by)} om ${fmtClock(new Date(loodsBaseline.set_at))}` : ' — nog niet ingesteld'}.</p>
+      <p class="hint">Vul in hoeveel er <b>op dit moment écht</b> in de loods ligt (onbewerkte wiet). De site berekent dan zelf hoeveel de klok van de hele wachtrij moet verschuiven zodat alle tijden (van iedereen) opnieuw kloppen — geen gaten of sprongen, alles schuift in dezelfde verhouding mee.</p>
+      <p class="hint">Vul er ook het echte aantal <b>zakjes wiet</b> bij in dat nu al klaarligt in de gedeelde opslag. Dat is een aparte, onafhankelijke correctie bovenop het model — zo kan het kloppen ook als het verwerkingstempo (zakjes/batch, minuten/batch) niet perfect het echte tempo volgt.</p>
+      <p class="hint">Huidige verschuiving: <b class="mono" style="color:var(--cream)">${loodsBaseline.offset_minutes >= 0 ? '+' : ''}${loodsBaseline.offset_minutes} min</b>, snelheid <b class="mono" style="color:var(--cream)">${loodsBaseline.batch_size}/${loodsBaseline.batch_minutes}min</b>, zakjes-correctie <b class="mono" style="color:var(--cream)">${loodsBaseline.zakjes_correctie >= 0 ? '+' : ''}${loodsBaseline.zakjes_correctie}</b>${loodsBaseline.set_by ? ` — gezet door ${escapeHtml(loodsBaseline.set_by)} om ${fmtClock(new Date(loodsBaseline.set_at))}` : ' — nog niet ingesteld'}.</p>
       <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
         <div>
-          <label for="loods-baseline-value">Werkelijke voorraad nu</label>
+          <label for="loods-baseline-value">Werkelijke voorraad nu (onbewerkte wiet)</label>
           <input type="number" id="loods-baseline-value" min="0" placeholder="bv. 13385" style="max-width:150px;">
+        </div>
+        <div>
+          <label for="loods-baseline-zakjes-value">Werkelijke zakjes in loods nu</label>
+          <input type="number" id="loods-baseline-zakjes-value" min="0" placeholder="bv. 1126" style="max-width:150px;">
         </div>
         <div>
           <label for="loods-baseline-batch-size">Zakjes / batch</label>
@@ -1818,6 +1832,7 @@ function bossView(allLog, allCustLog, loodsBaseline){
         </div>
         <button class="btn boss small" id="loods-baseline-save" style="margin-bottom:1px;">Kalibreren</button>
       </div>
+      <p class="hint">Zakjes-veld leeg laten = de bestaande zakjes-correctie ongewijzigd laten staan; enkel de voorraad/snelheid worden dan aangepast.</p>
       <div class="err" id="loods-baseline-err"></div>
       <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line);">
         ${loodsBaseline.paused
@@ -2064,9 +2079,12 @@ function computeCalibrationOffset(log, batchSize, batchMinutes, totalIngelegd, r
 async function saveLoodsBaseline(){
   const err = document.getElementById('loods-baseline-err');
   const val = parseInt(document.getElementById('loods-baseline-value').value, 10);
+  const zakjesValRaw = document.getElementById('loods-baseline-zakjes-value').value;
+  const zakjesVal = zakjesValRaw === '' ? NaN : parseInt(zakjesValRaw, 10);
   const bs = parseInt(document.getElementById('loods-baseline-batch-size').value, 10);
   const bm = parseInt(document.getElementById('loods-baseline-batch-minutes').value, 10);
   if(isNaN(val) || val < 0){ err.textContent = 'Voer een geldig voorraadaantal in.'; return; }
+  if(zakjesValRaw !== '' && (isNaN(zakjesVal) || zakjesVal < 0)){ err.textContent = 'Voer een geldig aantal zakjes in (of laat leeg).'; return; }
   if(isNaN(bs) || bs <= 0 || isNaN(bm) || bm <= 0){ err.textContent = 'Voer een geldige snelheid in.'; return; }
   const btn = document.getElementById('loods-baseline-save');
   btn.disabled = true; btn.textContent = 'Bezig…';
@@ -2074,9 +2092,21 @@ async function saveLoodsBaseline(){
     const freshLog = await fetchAllLoodsLog();
     const totalIngelegd = cache.users.reduce((s,u) => s + u.total_ingelegd, 0);
     const offsetMinutes = computeCalibrationOffset(freshLog, bs, bm, totalIngelegd, val);
+    // zakjes-correctie: onafhankelijk van de planten-kalibratie hierboven.
+    // Wat zou het model (met de NIEUWE offset/snelheid) tonen als "zakjes in
+    // loods", zonder correctie? Het verschil met de opgegeven werkelijke
+    // waarde wordt de nieuwe correctie. Leeg gelaten = bestaande correctie behouden.
+    let zakjesCorrectie = lastLoodsBaseline.zakjes_correctie || 0;
+    if(!isNaN(zakjesVal)){
+      const trimmedLog = buildPostCutoverLog(freshLog, cache.users, lastLoodsBaseline.ratio_cutover_at);
+      const previewResult = computeQueueTimeline(trimmedLog, bs, bm, offsetMinutes);
+      const modelWaarde = zakjesKlaarInLoods(previewResult, cache.users, 0);
+      zakjesCorrectie = zakjesVal - modelWaarde;
+    }
     const me = getUser(session);
     const { error } = await sb.rpc('fn_set_loods_baseline', {
       p_offset_minutes: offsetMinutes, p_batch_size: bs, p_batch_minutes: bm,
+      p_zakjes_correctie: zakjesCorrectie,
       p_boss_pin_hash: bossPinHash(), p_set_by: me ? me.name : 'boss'
     });
     if(error){ err.textContent = friendlyError(error); btn.disabled = false; btn.textContent = 'Kalibreren'; return; }
