@@ -341,7 +341,7 @@ const RATIO_IN = 2, RATIO_OUT = 1;             // leden: 2 planten -> 1 zakje (l
 // OUDE ratio — deze constante blijft die oude waarde, los van RATIO_IN.
 const LEGACY_RATIO_IN = 3;
 const KLANT_RATIO_IN = 4, KLANT_RATIO_OUT = 1; // klanten: 4 geleverd -> 1 zakje
-const MAX_MOMENTEEL_INLEG = 5000; // max planten per persoon tegelijk onverwerkt in de loods
+const MAX_MOMENTEEL_INLEG = 6000; // max planten per persoon tegelijk onverwerkt in de loods
 // kleurt oplopend richting de limiet: null = normaal, anders een CSS-kleur
 function momenteelInlegKleur(value){
   const ratio = value / MAX_MOMENTEEL_INLEG;
