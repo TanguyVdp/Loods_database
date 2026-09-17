@@ -1172,8 +1172,8 @@ function dashboardView(allInlegLog, baseline){
         <td class="num" data-momenteel-inleg="${u.id}" style="${momenteelInlegKleur(momenteelInleg) ? `color:${momenteelInlegKleur(momenteelInleg)};font-weight:700;` : ''}">${fmtNum(momenteelInleg)}</td>
         <td class="num">${fmtNum(z)}</td>
         <td class="num">${fmtNum(u.opgehaald)}</td>
-        <td class="num" data-momenteel-tegoed="${u.id}">${fmtNum(momenteelTegoed)}</td>
-        <td class="num tegoed">${fmtNum(tegoed)}</td>
+        <td class="num tegoed" data-momenteel-tegoed="${u.id}">${fmtNum(momenteelTegoed)}</td>
+        <td class="num">${fmtNum(tegoed)}</td>
       </tr>`;
     }).join('');
 
@@ -1792,8 +1792,8 @@ function bossView(allLog, allCustLog, loodsBaseline){
           <td class="num" style="${momenteelInlegKleur(s.momenteelInleg) ? `color:${momenteelInlegKleur(s.momenteelInleg)};font-weight:700;` : ''}">${fmtNum(s.momenteelInleg)}${momenteelInlegKleur(s.momenteelInleg) ? ' ⚠️' : ''}</td>
           <td class="num">${fmtNum(s.zakjes)}</td>
           <td class="num">${fmtNum(s.opgehaald)}</td>
-          <td class="num">${fmtNum(s.momenteelTegoed)}</td>
-          <td class="num tegoed">${fmtNum(s.tegoed)}</td>
+          <td class="num tegoed">${fmtNum(s.momenteelTegoed)}</td>
+          <td class="num">${fmtNum(s.tegoed)}</td>
           <td class="num">${fmtNum(s.geleverd)}</td>
           <td style="white-space:nowrap;">${s.id ? `
             ${s.discordId ? `<span class="mono" style="font-size:12px;color:var(--muted);margin-right:6px;">${escapeHtml(s.discordId)}</span>` : ''}
