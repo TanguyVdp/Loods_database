@@ -76,8 +76,8 @@ function scheduleBatch(startDate, batchMinutes) {
   }
 }
 function computeQueueTimeline(log, batchSize, batchMinutes, offsetMinutes) {
-  batchSize = batchSize || 3;
-  batchMinutes = batchMinutes || 3;
+  batchSize = batchSize || 5;
+  batchMinutes = batchMinutes || 1;
   const offsetMs = (offsetMinutes || 0) * 60000;
   const deposits = log.filter(e => e.type === 'inleg' && e.zakjes_delta > 0)
     .slice().sort((a, b) => new Date(a.ts) - new Date(b.ts));
@@ -174,7 +174,7 @@ async function main() {
     sbGet('loods_baseline?select=offset_minutes,batch_size,batch_minutes,paused,paused_at,ratio_cutover_at'),
     sbGet('users_public?select=id,name,discord_id,legacy_zakjes')
   ]);
-  const baseline = baselineRows[0] || { offset_minutes: 0, batch_size: 3, batch_minutes: 3 };
+  const baseline = baselineRows[0] || { offset_minutes: 0, batch_size: 5, batch_minutes: 1 };
   const discordByName = new Map(users.map(u => [u.name.toLowerCase(), u.discord_id]));
 
   const trimmedLog = buildPostCutoverLog(log, users, baseline.ratio_cutover_at);
