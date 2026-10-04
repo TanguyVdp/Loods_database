@@ -342,8 +342,19 @@ const RATIO_IN = 2, RATIO_OUT = 1;             // leden: 2 planten -> 1 zakje (l
 const LEGACY_RATIO_IN = 3;
 const KLANT_RATIO_IN = 4, KLANT_RATIO_OUT = 1; // klanten: 4 geleverd -> 1 zakje
 const MAX_MOMENTEEL_INLEG = 6000; // max planten per persoon tegelijk onverwerkt in de loods
+// "gangpot" is het gedeelde profiel waar de automatische afroming naartoe
+// gaat (zie fn_register_inleg in de database) — dat mag nooit tegen de
+// onverwerkt-limiet aanlopen, dus overal waar die limiet gecheckt/getoond
+// wordt, behandelen we gangpot als onbeperkt.
+const GANGPOT_NAME = 'gangpot';
+function isGangpot(user){ return !!user && typeof user.name === 'string' && user.name.trim().toLowerCase() === GANGPOT_NAME; }
+function momenteelInlegRuimte(user, momenteelInleg){
+  return isGangpot(user) ? Infinity : Math.max(0, MAX_MOMENTEEL_INLEG - momenteelInleg);
+}
 // kleurt oplopend richting de limiet: null = normaal, anders een CSS-kleur
-function momenteelInlegKleur(value){
+// (user optioneel: gangpot krijgt nooit een waarschuwingskleur)
+function momenteelInlegKleur(value, user){
+  if(isGangpot(user)) return null;
   const ratio = value / MAX_MOMENTEEL_INLEG;
   if(ratio >= 1) return 'var(--danger)';
   if(ratio >= 0.75) return 'var(--warn)';
@@ -619,7 +630,7 @@ function updateLoodsStatTile(){
       if(c1){
         const mi = momenteelInlegVoorPersoon(u, verwerktPerPersoon);
         c1.textContent = fmtNum(mi);
-        const kleur = momenteelInlegKleur(mi);
+        const kleur = momenteelInlegKleur(mi, u);
         c1.style.color = kleur || '';
         c1.style.fontWeight = kleur ? '700' : '';
       }
@@ -1159,7 +1170,7 @@ function dashboardView(allInlegLog, baseline){
   // zou je kunnen "ophalen" wat fysiek nog niet klaar is
   const myMomenteelTegoed = Math.max(0, totaalVerwerktVoorPersoon(me, verwerktPerPersoon) - me.opgehaald);
   const myMomenteelInleg = momenteelInlegVoorPersoon(me, verwerktPerPersoon);
-  const myInlegRuimte = Math.max(0, MAX_MOMENTEEL_INLEG - myMomenteelInleg);
+  const myInlegRuimte = momenteelInlegRuimte(me, myMomenteelInleg);
   const rows = [...cache.users].sort((a,b)=> (zakjesVoor(b)-b.opgehaald) - (zakjesVoor(a)-a.opgehaald))
     .map(u => {
       const z = zakjesVoor(u);
@@ -1169,7 +1180,7 @@ function dashboardView(allInlegLog, baseline){
       return `<tr class="${u.id===me.id?'me':''}">
         <td>${personDot(u.name)}${escapeHtml(u.name)}</td>
         <td class="num">${fmtNum(u.total_ingelegd)}</td>
-        <td class="num" data-momenteel-inleg="${u.id}" style="${momenteelInlegKleur(momenteelInleg) ? `color:${momenteelInlegKleur(momenteelInleg)};font-weight:700;` : ''}">${fmtNum(momenteelInleg)}</td>
+        <td class="num" data-momenteel-inleg="${u.id}" style="${momenteelInlegKleur(momenteelInleg, u) ? `color:${momenteelInlegKleur(momenteelInleg, u)};font-weight:700;` : ''}">${fmtNum(momenteelInleg)}</td>
         <td class="num">${fmtNum(z)}</td>
         <td class="num">${fmtNum(u.opgehaald)}</td>
         <td class="num tegoed" data-momenteel-tegoed="${u.id}">${fmtNum(momenteelTegoed)}</td>
@@ -1241,10 +1252,10 @@ function dashboardView(allInlegLog, baseline){
       <div class="card">
         <h2>${ICONS.sprout}Planten inleggen</h2>
         <p class="hint">Geef door hoeveel planten je in de loods hebt gelegd. Wordt meteen opgeteld bij het totaal (${me.total_ingelegd} nu) en omgerekend: <b>elke ${RATIO_IN} planten leveren ${RATIO_OUT} zakje op, dus ${RATIO_IN}/${RATIO_OUT}</b>.</p>
-        <p class="hint">Max <b>${fmtNum(MAX_MOMENTEEL_INLEG)}</b> planten per persoon tegelijk onverwerkt in de loods — jij hebt er nu <b class="mono" style="color:${momenteelInlegKleur(myMomenteelInleg) || 'var(--cream)'}">${fmtNum(myMomenteelInleg)}</b> liggen, dus nog ruimte voor <b class="mono" style="color:var(--lime)">${fmtNum(myInlegRuimte)}</b>. Die ruimte groeit vanzelf weer aan naarmate de wachtrij verwerkt.</p>
-        ${momenteelInlegKleur(myMomenteelInleg) ? `<p class="hint" style="color:${momenteelInlegKleur(myMomenteelInleg)};">⚠️ ${myInlegRuimte<=0 ? 'Je zit aan (of over) de limiet — je kan nu niks bijleggen tot er ruimte vrijkomt.' : `Je zit al op ${fmtNum(myMomenteelInleg)}/${fmtNum(MAX_MOMENTEEL_INLEG)} — nog maar weinig ruimte over.`}</p>` : ''}
+        <p class="hint">${isGangpot(me) ? 'Geen limiet op onverwerkte voorraad voor dit profiel.' : `Max <b>${fmtNum(MAX_MOMENTEEL_INLEG)}</b> planten per persoon tegelijk onverwerkt in de loods — jij hebt er nu <b class="mono" style="color:${momenteelInlegKleur(myMomenteelInleg, me) || 'var(--cream)'}">${fmtNum(myMomenteelInleg)}</b> liggen, dus nog ruimte voor <b class="mono" style="color:var(--lime)">${fmtNum(myInlegRuimte)}</b>. Die ruimte groeit vanzelf weer aan naarmate de wachtrij verwerkt.`}</p>
+        ${momenteelInlegKleur(myMomenteelInleg, me) ? `<p class="hint" style="color:${momenteelInlegKleur(myMomenteelInleg, me)};">⚠️ ${myInlegRuimte<=0 ? 'Je zit aan (of over) de limiet — je kan nu niks bijleggen tot er ruimte vrijkomt.' : `Je zit al op ${fmtNum(myMomenteelInleg)}/${fmtNum(MAX_MOMENTEEL_INLEG)} — nog maar weinig ruimte over.`}</p>` : ''}
         <label for="in-amount">Aantal planten</label>
-        <input type="number" id="in-amount" min="1" step="1" max="${myInlegRuimte}" placeholder="bv. 120" ${myInlegRuimte<=0?'disabled':''}>
+        <input type="number" id="in-amount" min="1" step="1" ${Number.isFinite(myInlegRuimte) ? `max="${myInlegRuimte}"` : ''} placeholder="bv. 120" ${myInlegRuimte<=0?'disabled':''}>
         <div class="preview" id="in-preview"></div>
         <div style="margin-top:14px;"><button class="btn block" id="in-submit" ${myInlegRuimte<=0?'disabled':''}>Inleg registreren</button></div>
         <div class="err" id="in-err"></div>
@@ -1789,7 +1800,7 @@ function bossView(allLog, allCustLog, loodsBaseline){
           <td style="width:1%;">${s.id ? `<span class="drag-handle" data-drag-handle="1" title="Sleep om te herschikken">${ICONS.grip}</span>` : ''}</td>
           <td>${personDot(s.name)}${escapeHtml(s.name)}</td>
           <td class="num">${fmtNum(s.ingelegd)}</td>
-          <td class="num" style="${momenteelInlegKleur(s.momenteelInleg) ? `color:${momenteelInlegKleur(s.momenteelInleg)};font-weight:700;` : ''}">${fmtNum(s.momenteelInleg)}${momenteelInlegKleur(s.momenteelInleg) ? ' ⚠️' : ''}</td>
+          <td class="num" style="${momenteelInlegKleur(s.momenteelInleg, s) ? `color:${momenteelInlegKleur(s.momenteelInleg, s)};font-weight:700;` : ''}">${fmtNum(s.momenteelInleg)}${momenteelInlegKleur(s.momenteelInleg, s) ? ' ⚠️' : ''}</td>
           <td class="num">${fmtNum(s.zakjes)}</td>
           <td class="num">${fmtNum(s.opgehaald)}</td>
           <td class="num tegoed">${fmtNum(s.momenteelTegoed)}</td>
@@ -2178,9 +2189,11 @@ function attachBossHandlers(){
       const tegoed = z - u.opgehaald;
       const verwerktPerPersoonBoss = verwerkteZakjesPerPersoon(lastQueueResult);
       const momenteelInleg = momenteelInlegVoorPersoon(u, verwerktPerPersoonBoss);
-      const ruimte = Math.max(0, MAX_MOMENTEEL_INLEG - momenteelInleg);
+      const ruimte = momenteelInlegRuimte(u, momenteelInleg);
       const momenteelTegoedBoss = Math.max(0, totaalVerwerktVoorPersoon(u, verwerktPerPersoonBoss) - u.opgehaald);
-      document.getElementById('boss-reg-in-hint').innerHTML = `Wordt opgeteld bij ${escapeHtml(u.name)}'s totaal (${fmtNum(u.total_ingelegd)} nu) — elke ${RATIO_IN} planten leveren ${RATIO_OUT} zakje op. Max ${fmtNum(MAX_MOMENTEEL_INLEG)} onverwerkt per persoon — ${escapeHtml(u.name)} heeft er nu ${fmtNum(momenteelInleg)}, dus nog ruimte voor <b style="color:var(--lime)">${fmtNum(ruimte)}</b>.`;
+      document.getElementById('boss-reg-in-hint').innerHTML = isGangpot(u)
+        ? `Wordt opgeteld bij ${escapeHtml(u.name)}'s totaal (${fmtNum(u.total_ingelegd)} nu) — elke ${RATIO_IN} planten leveren ${RATIO_OUT} zakje op. Geen limiet op onverwerkte voorraad voor dit profiel.`
+        : `Wordt opgeteld bij ${escapeHtml(u.name)}'s totaal (${fmtNum(u.total_ingelegd)} nu) — elke ${RATIO_IN} planten leveren ${RATIO_OUT} zakje op. Max ${fmtNum(MAX_MOMENTEEL_INLEG)} onverwerkt per persoon — ${escapeHtml(u.name)} heeft er nu ${fmtNum(momenteelInleg)}, dus nog ruimte voor <b style="color:var(--lime)">${fmtNum(ruimte)}</b>.`;
       document.getElementById('boss-reg-out-hint').innerHTML = `${escapeHtml(u.name)} heeft nu <b class="mono" style="color:var(--lime)">${fmtNum(momenteelTegoedBoss)}</b> zakje${momenteelTegoedBoss===1?'':'s'} momenteel tegoed (echt verwerkt) — totaal toegekend tegoed: ${fmtNum(tegoed)}.`;
       const outAmountBoss = document.getElementById('boss-reg-out-amount');
       if(outAmountBoss) outAmountBoss.dataset.maxTegoed = momenteelTegoedBoss;
@@ -2313,7 +2326,7 @@ function attachDashboardHandlers(){
       if(!v || v <= 0){ preview.innerHTML=''; return; }
       const me = getUser(session);
       const momenteelInleg = momenteelInlegVoorPersoon(me, verwerkteZakjesPerPersoon(lastQueueResult));
-      const ruimte = Math.max(0, MAX_MOMENTEEL_INLEG - momenteelInleg);
+      const ruimte = momenteelInlegRuimte(me, momenteelInleg);
       if(v > ruimte){
         preview.innerHTML = `<span class="err">Kan niet — max ${fmtNum(MAX_MOMENTEEL_INLEG)} planten tegelijk onverwerkt per persoon. Je hebt nog ruimte voor <b>${fmtNum(ruimte)}</b>.</span>`;
         return;

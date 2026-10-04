@@ -28,6 +28,11 @@
 --   - dit geldt vanaf NU voor nieuwe inleg; niet retroactief op bestaande
 --     logboek-regels (niet nodig: de loods wordt toch volledig gereset,
 --     zie reset-loods-data.sql — volgorde van de 2 scripts maakt niet uit)
+--   - gangpot is VRIJGESTELD van de max-onverwerkt-limiet (nu 6.000): de
+--     automatische afroming liep hier toch al nooit tegenaan (die gaat
+--     buiten de limiet-check om), maar nu ook als iemand ooit rechtstreeks
+--     ALS gangpot inlegt, of de Boss dat via het Boss-formulier voor
+--     gangpot doet — onbeperkt onverwerkte voorraad voor dit profiel
 --
 -- Voer dit EENMALIG uit in de Supabase SQL Editor (New query > plak > Run).
 -- ============================================================
@@ -49,14 +54,18 @@ declare
   v_gangpot users; v_gangpot_before int; v_gangpot_after int; v_gangpot_rest int;
 begin
   if p_amount is null or p_amount <= 0 then raise exception 'ONGELDIG_AANTAL'; end if;
-  if p_huidig_momenteel_inleg is not null and p_huidig_momenteel_inleg + p_amount > 6000 then
+
+  select id into v_gangpot_id from users where lower(name) = 'gangpot';
+
+  -- gangpot zelf is vrijgesteld van de max-onverwerkt-limiet (onbeperkte
+  -- onverwerkte voorraad) — voor iedereen anders blijft de limiet gelden
+  if (v_gangpot_id is null or p_user_id <> v_gangpot_id)
+     and p_huidig_momenteel_inleg is not null and p_huidig_momenteel_inleg + p_amount > 6000 then
     raise exception 'MAX_ONVERWERKT_BEREIKT';
   end if;
 
   select * into v_user from users where id = p_user_id for update;
   if v_user.id is null then raise exception 'GEBRUIKER_NIET_GEVONDEN'; end if;
-
-  select id into v_gangpot_id from users where lower(name) = 'gangpot';
 
   if v_gangpot_id is not null and v_gangpot_id <> p_user_id then
     v_amount_gangpot := floor(p_amount / 5.0);
